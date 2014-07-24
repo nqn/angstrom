@@ -1,4 +1,4 @@
-angstrom
+Ångstrom
 ========
 
-Ångstrom: Map-reduce style internal metrics collection for Mesos
+Map-reduce style internal metrics collection for Mesos.
