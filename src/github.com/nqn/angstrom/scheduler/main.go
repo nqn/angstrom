@@ -24,7 +24,7 @@ type SlaveInfo struct {
 	Pid string `json:"pid"`
 }
 
-// TODO(nnielsen): Reintroduce custom executor.
+// TODO(nnielsen): Compute executor count from fan-out.
 func main() {
 	taskId := 0
 	slaves := list.New()
@@ -32,6 +32,8 @@ func main() {
 
 	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
 	executorUri := flag.String("executor-uri", localExecutor, "URI of executor executable")
+	// TODO(nnielsen): Parse fan-out flag.
+
 	flag.Parse()
 
 	executor := &mesos.ExecutorInfo{
