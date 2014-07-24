@@ -5,17 +5,57 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mesosphere/mesos-go/mesos"
-	"path/filepath"
 	"strconv"
-
+	"net/http"
+	"log"
+	"encoding/json"
+	"io/ioutil"
+	"strings"
+	"container/list"
 //	"os"
+//	"path/filepath"
 )
+
+type MonitorInfo struct {
+	StaticsArray []StatisticsInfo
+}
+
+type StatisticsInfo struct {
+	ExecutorId string
+	ExecutorName string
+	FrameworkId string
+	Source string
+	Statistics []Statistics
+}
+
+type Statistics struct {
+	CpusLimit float64
+	CpusNrPeriods int
+	CpusNrThrottled int
+	CpusSystemTimeSecs float64
+	CpusThrottledTimeSecs float64
+	CpusUserYimeSecs float64
+	MemAnonBytes int
+	MemFileBytes int
+	MemLimitBytes int
+	MemMappedFileBytes int
+	MemRss_bytes int
+	Timestamp float64
+}
+
+type MasterInfo struct {
+	Slaves []SlaveInfo `json:"slaves"`
+}
+
+type SlaveInfo struct {
+	Pid string `json:"pid"`
+}
 
 // TODO(nnielsen): Reintroduce custom executor.
 func main() {
 	taskId := 0
-	exit := make(chan bool)
-	localExecutor, _ := executorPath()
+	slaves := list.New()
+	// localExecutor, _ := executorPath()
 
 	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
 	// executorUri := flag.String("executor-uri", localExecutor, "URI of executor executable")
@@ -32,6 +72,28 @@ func main() {
 	// 	Name:   proto.String("Test Executor (Go)"),
 	// 	Source: proto.String("go_test"),
 	// }
+
+	resp, err := http.Get("http://" + *master + "/master/state.json")
+	if err != nil {
+		log.Panic("Cannot get slave list from master '" + *master + "'")
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response")
+	}
+
+	var target MasterInfo
+	err = json.Unmarshal(body, &target)
+	if err != nil {
+		log.Panic("Error deserializing RenderResult from JSON: " + err.Error())
+	}
+
+	for _, slave := range target.Slaves {
+		pidSplit := strings.Split(slave.Pid, "@")
+		slaves.PushBack(pidSplit[1])
+	}
+	// TODO(nnielsen): Partition node list and pack in angstrom tasks.
 
 	driver := mesos.SchedulerDriver{
 		Master: *master,
@@ -52,7 +114,10 @@ func main() {
 								Value: proto.String("angstrom-task-" + strconv.Itoa(taskId)),
 							},
 							SlaveId:  offer.SlaveId,
-							Executor: executor,
+							// Executor: executor,
+							Command: &mesos.CommandInfo{
+								Value: proto.String("sleep 5"),
+							},
 							Resources: []*mesos.Resource{
 								mesos.ScalarResource("cpus", 1),
 								mesos.ScalarResource("mem", 512),
@@ -65,7 +130,7 @@ func main() {
 			},
 
 			StatusUpdate: func(driver *mesos.SchedulerDriver, status mesos.TaskStatus) {
-				fmt.Println("Received task status: " + *status.Message)
+				fmt.Println("Received task status")
 
 				if *status.State == mesos.TaskState_TASK_FINISHED {
 				}
