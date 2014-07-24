@@ -16,33 +16,6 @@ import (
 	"path/filepath"
 )
 
-type MonitorInfo struct {
-	StaticsArray []StatisticsInfo
-}
-
-type StatisticsInfo struct {
-	ExecutorId string
-	ExecutorName string
-	FrameworkId string
-	Source string
-	Statistics []Statistics
-}
-
-type Statistics struct {
-	CpusLimit float64
-	CpusNrPeriods int
-	CpusNrThrottled int
-	CpusSystemTimeSecs float64
-	CpusThrottledTimeSecs float64
-	CpusUserYimeSecs float64
-	MemAnonBytes int
-	MemFileBytes int
-	MemLimitBytes int
-	MemMappedFileBytes int
-	MemRss_bytes int
-	Timestamp float64
-}
-
 type MasterInfo struct {
 	Slaves []SlaveInfo `json:"slaves"`
 }
@@ -115,6 +88,7 @@ func main() {
 							},
 							SlaveId:  offer.SlaveId,
 							Executor: executor,
+							Data: []byte("{\"slave\": \"localhost:5051\"}"),
 							Resources: []*mesos.Resource{
 								mesos.ScalarResource("cpus", 1),
 								mesos.ScalarResource("mem", 512),
