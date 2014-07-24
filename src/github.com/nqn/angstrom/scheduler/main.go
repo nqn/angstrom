@@ -12,8 +12,8 @@ import (
 	"io/ioutil"
 	"strings"
 	"container/list"
-//	"os"
-//	"path/filepath"
+	"os"
+	"path/filepath"
 )
 
 type MonitorInfo struct {
@@ -55,23 +55,23 @@ type SlaveInfo struct {
 func main() {
 	taskId := 0
 	slaves := list.New()
-	// localExecutor, _ := executorPath()
+	localExecutor, _ := executorPath()
 
 	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
-	// executorUri := flag.String("executor-uri", localExecutor, "URI of executor executable")
+	executorUri := flag.String("executor-uri", localExecutor, "URI of executor executable")
 	flag.Parse()
 
-	// executor := &mesos.ExecutorInfo{
-	// 	ExecutorId: &mesos.ExecutorID{Value: proto.String("default")},
-	// 	Command: &mesos.CommandInfo{
-	// 		Value: proto.String("./example_executor"),
-	// 		Uris: []*mesos.CommandInfo_URI{
-	// 			&mesos.CommandInfo_URI{Value: executorUri},
-	// 		},
-	// 	},
-	// 	Name:   proto.String("Test Executor (Go)"),
-	// 	Source: proto.String("go_test"),
-	// }
+	executor := &mesos.ExecutorInfo{
+		ExecutorId: &mesos.ExecutorID{Value: proto.String("default")},
+		Command: &mesos.CommandInfo{
+			Value: proto.String("./executor"),
+			Uris: []*mesos.CommandInfo_URI{
+				&mesos.CommandInfo_URI{Value: executorUri},
+			},
+		},
+		Name:   proto.String("Test Executor (Go)"),
+		Source: proto.String("go_test"),
+	}
 
 	resp, err := http.Get("http://" + *master + "/master/state.json")
 	if err != nil {
@@ -114,10 +114,7 @@ func main() {
 								Value: proto.String("angstrom-task-" + strconv.Itoa(taskId)),
 							},
 							SlaveId:  offer.SlaveId,
-							// Executor: executor,
-							Command: &mesos.CommandInfo{
-								Value: proto.String("sleep 5"),
-							},
+							Executor: executor,
 							Resources: []*mesos.Resource{
 								mesos.ScalarResource("cpus", 1),
 								mesos.ScalarResource("mem", 512),
@@ -145,12 +142,12 @@ func main() {
 	driver.Join()
 }
 
-// func executorPath() (string, error) {
-// 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	path := dir + "/example_executor"
-// 	return path, nil
-// }
+func executorPath() (string, error) {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		return "", err
+	}
+
+	path := dir + "/executor"
+	return path, nil
+}
