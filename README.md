@@ -3,7 +3,7 @@
 
 Scalable, self-hosted metrics collection and global cluster state for Mesos.
 
-![Bruchfläche](http://upload.wikimedia.org/wikipedia/commons/8/8a/Bruchfläche_eines_Perlmuttstücks.JPG)
+![Ångström](http://cl.ly/image/3P2301053q1a)
 
 ```json
 {
