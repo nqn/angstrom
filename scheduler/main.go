@@ -390,20 +390,33 @@ func main() {
 	driver.Start()
 
 	http.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
+		percentOf := func(a float64, b float64) float64 {
+			return (a / b) * 100
+		}
+
 		// TODO(nnielsen): Support 'from' field, specifying samples in time range to serve.
 		cluster := &ClusterStateJson {
 			TotalCpus: cluster.Cpus,
 			TotalMemory: cluster.Memory,
 			TotalDisk: cluster.Disk,
 			AllocatedCpus: cluster.AllocatedCpus,
+			AllocatedCpusPercent: percentOf(cluster.AllocatedCpus, cluster.Cpus),
 			AllocatedMemory: cluster.AllocatedMemory,
+			AllocatedMemoryPercent: percentOf(cluster.AllocatedMemory, cluster.Memory),
 			AllocatedDisk: cluster.AllocatedDisk,
+			AllocatedDiskPercent: percentOf(cluster.AllocatedDisk, cluster.Disk),
 			UsedCpus: cluster.UsedCpus,
+			UsedCpusPercent: percentOf(cluster.UsedCpus, cluster.Cpus),
 			UsedMemory: cluster.UsedMemory,
+			UsedMemoryPercent: percentOf(cluster.UsedMemory, cluster.Memory),
 			UsedDisk: cluster.UsedDisk,
+			UsedDiskPercent: percentOf(cluster.UsedDisk, cluster.Disk),
 			SlackCpus: cluster.SlackCpus,
+			SlackCpusPercent: percentOf(cluster.SlackCpus, cluster.Cpus),
 			SlackMemory: cluster.SlackMemory,
+			SlackMemoryPercent: percentOf(cluster.SlackMemory, cluster.Memory),
 			SlackDisk: cluster.SlackDisk,
+			SlackDiskPercent: percentOf(cluster.SlackDisk, cluster.Disk),
 		}
 
 		state := make(map[string]*ClusterStateJson)
