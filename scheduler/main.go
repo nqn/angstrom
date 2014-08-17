@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"log"
 	"time"
+	"net"
 	"encoding/json"
 	"io/ioutil"
 	"strings"
@@ -183,18 +184,62 @@ type ClusterStateJson struct {
 func main() {
 	taskId := 0
 	localExecutor, _ := executorPath()
+	hostname, _ := os.Hostname()
 
 	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
-	executorUri := flag.String("executor-uri", localExecutor, "URI of executor executable")
+	executorPath := flag.String("executor-uri", localExecutor, "Path to executor executable")
+	address := flag.String("address", hostname, "Hostname to serve artifacts from")
 
 	flag.Parse()
+
+	// Determine address to listen on.
+	interfaces, _ := net.Interfaces()
+	for _, inter := range interfaces {
+		if inter.Name == "lo" {
+			continue
+		}
+		addr, err := inter.Addrs()
+		if err == nil {
+			network := addr[0].String()
+			networkSplit := strings.Split(network, "/")
+			address = &networkSplit[0]
+			break
+		}
+	}
+
+	serveExecutorArtifact := func(path string) string {
+		serveFile := func(pattern string, filename string) {
+			http.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, filename)
+			})
+		}
+
+		// Create base path (http://foobar:5000/<base>)
+		pathSplit := strings.Split(path, "/")
+		var base string
+		if len(pathSplit) > 0 {
+			base = pathSplit[len(pathSplit)-1]
+		} else {
+			base = path
+		}
+		serveFile("/"+base, path)
+
+		hostURI := fmt.Sprintf("http://%s:%d/%s", *address, 9000, base)
+
+		fmt.Printf("Serving '%s'\n", hostURI)
+
+		return hostURI
+	}
+
+	executorURI := serveExecutorArtifact(*executorPath)
+	executable := true
 
 	executor := &mesos.ExecutorInfo{
 		ExecutorId: &mesos.ExecutorID{Value: proto.String("default")},
 		Command: &mesos.CommandInfo{
 			Value: proto.String("./executor"),
 			Uris: []*mesos.CommandInfo_URI{
-				&mesos.CommandInfo_URI{Value: executorUri},
+				&mesos.CommandInfo_URI{Value: &executorURI, Executable: &executable},
 			},
 		},
 		Name:   proto.String("Test Executor (Go)"),
@@ -333,7 +378,7 @@ func main() {
 	driver.Start()
 
 	http.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
-		state := &ClusterStateJson {
+		cluster := &ClusterStateJson {
 			TotalCpus: cluster.Cpus,
 			TotalMemory: cluster.Memory,
 			TotalDisk: cluster.Disk,
@@ -345,7 +390,8 @@ func main() {
 			UsedDisk: cluster.UsedDisk,
 		}
 
-		state := make(map[string]ClusterStateJson)
+		state := make(map[string]*ClusterStateJson)
+		state["cluster"] = cluster
 
 		body, err := json.Marshal(state)
 		if err == nil {
