@@ -142,7 +142,7 @@ func (c *Cluster) Update() {
 	for frameworkId, framework := range c.Frameworks {
 		if _, ok := activeFrameworks[frameworkId] ; ! ok {
 			fmt.Println("Removing inactive framework: " + frameworkId)
-			delete(activeFrameworks, frameworkId)
+			delete(c.Frameworks, frameworkId)
 		} else {
 			for _, executor := range framework.Executors {
 				c.UsedCpus += executor.Cpus
@@ -269,7 +269,6 @@ func main() {
 
 			FrameworkMessage: func(driver *mesos.SchedulerDriver, _executorId mesos.ExecutorID, slaveId mesos.SlaveID, data string) {
 				// TODO(nnielsen): Compute error.
-				// fmt.Println("Received: " + data)
 				var target []StatisticsInfo
 				err := json.Unmarshal([]byte(data), &target)
 				if err != nil {
@@ -334,7 +333,7 @@ func main() {
 
 	driver.Start()
 
-	http.HandleFunc("/cluster", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
 		state := &ClusterStateJson {
 			TotalCpus: cluster.Cpus,
 			TotalMemory: cluster.Memory,

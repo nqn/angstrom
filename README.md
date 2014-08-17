@@ -1,6 +1,33 @@
 Ångström
 ========
 
-Map-reduce style internal metrics collection for Mesos.
+Scalable, self-hosted metrics collection and global cluster state for Mesos.
 
 ![Bruchfläche](http://upload.wikimedia.org/wikipedia/commons/8/8a/Bruchfläche_eines_Perlmuttstücks.JPG)
+
+```json
+{
+	"TotalCpus": 2,
+	"TotalMemory": 5376,
+	"TotalDisk": 9948,
+	"AllocatedCpus": 1.5,
+	"AllocatedCpusPercent": 0,
+	"AllocatedMemory": 160,
+	"AllocatedMemoryPercent": 0,
+	"AllocatedDisk": 0,
+	"AllocatedDiskPercent": 0,
+	"UsedCpus": 0,
+	"UsedCpusPercent": 0,
+	"UsedMemory": 17.58203125,
+	"UsedMemoryPercent": 0,
+	"UsedDisk": 0,
+	"UsedDiskPercent": 0,
+	"SlackCpus": 0,
+	"SlackCpusPercent": 0,
+	"SlackMemory": 0,
+	"SlackMemoryPercent": 0,
+	"SlackDisk": 0,
+	"SlackDiskPercent": 0
+}
+```
+
