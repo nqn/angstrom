@@ -3,7 +3,7 @@
 
 Scalable, self-hosted metrics collection and global cluster state for Mesos.
 
-![Ångström](http://cl.ly/image/3P2301053q1a)
+![Ångström](http://cl.ly/image/3P2301053q1a/angstrom.png)
 
 ```json
 {
