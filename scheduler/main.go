@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/mesosphere/mesos-go/mesos"
 	"strconv"
-	"log"
 	"time"
 	"net"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"net/http"
+	"github.com/golang/glog"
 )
 
 type MasterInfo struct {
@@ -90,18 +90,18 @@ func (c *Cluster) Update() {
 
 	resp, err := http.Get("http://" + c.Master + "/master/state.json")
 	if err != nil {
-		log.Panic("Cannot get slave list from master '" + c.Master + "'")
+		glog.Fatalf("Cannot get slave list from master '" + c.Master + "'")
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error reading response")
+		glog.Warning("Error reading response")
 	}
 
 	var target MasterInfo
 	err = json.Unmarshal(body, &target)
 	if err != nil {
-		log.Panic("Error deserializing RenderResult from JSON: " + err.Error())
+		glog.Fatalf("Error deserializing RenderResult from JSON: " + err.Error())
 	}
 
 	c.Cpus = 0.0
@@ -148,7 +148,7 @@ func (c *Cluster) Update() {
 	c.UsedDisk = 0
 	for frameworkId, framework := range c.Frameworks {
 		if _, ok := activeFrameworks[frameworkId] ; ! ok {
-			fmt.Println("Removing inactive framework: " + frameworkId)
+			glog.V(2).Infof("Removing inactive framework: " + frameworkId)
 			delete(c.Frameworks, frameworkId)
 		} else {
 			for _, executor := range framework.Executors {
@@ -162,8 +162,6 @@ func (c *Cluster) Update() {
 	c.SlackCpus = c.AllocatedCpus - c.UsedCpus
 	c.SlackMemory = c.AllocatedMemory - c.UsedMemory
 	c.SlackDisk = c.AllocatedDisk - c.UsedDisk
-
-	// Compute percentages.
 }
 
 type ClusterStateJson struct {
@@ -238,7 +236,7 @@ func main() {
 
 		hostURI := fmt.Sprintf("http://%s:%d/%s", *address, 9000, base)
 
-		fmt.Printf("Serving '%s'\n", hostURI)
+		glog.V(2).Infof("Serving '%s'\n", hostURI)
 
 		return hostURI
 	}
@@ -284,6 +282,8 @@ func main() {
 
 		slaves.Remove(slave)
 
+		// TODO(nnielsen): Map task -> monitored slave, for restart.
+
 		return &mesos.TaskInfo{
 			Name: proto.String("angstrom-task"),
 			TaskId: &mesos.TaskID{
@@ -302,7 +302,7 @@ func main() {
 	driver := mesos.SchedulerDriver{
 		Master: *master,
 		Framework: mesos.FrameworkInfo{
-			Name: proto.String("Angstrom metrics framework"),
+			Name: proto.String("Angstrom metrics"),
 			User: proto.String(""),
 		},
 
@@ -370,13 +370,14 @@ func main() {
 						executor.Memory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
 					}
 
-					fmt.Println(stat)
+					glog.V(2).Info(stat)
 
 					executor.Stat = stat
 				}
 			},
 
 			StatusUpdate: func(driver *mesos.SchedulerDriver, status mesos.TaskStatus) {
+				// TODO(nnielsen): Readd slave task to queue in case of any terminal state.
 				if *status.State == mesos.TaskState_TASK_RUNNING {
 				} else if *status.State == mesos.TaskState_TASK_FINISHED {
 				}
