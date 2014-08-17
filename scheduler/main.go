@@ -102,11 +102,7 @@ func NewCluster(master string) *Cluster {
 
 func (c *Cluster) Update() {
 	if c.Sample != nil {
-		// TODO(nnielsen): Guard archive list with mutex.
-		// Currently not safe taken HTTP endpoint traverse archive.
-
 		c.ArchiveLock.Lock()
-
 		c.Archive.PushBack(c.Sample)
 
 		// Only keep archiveMaxSize sampels around.
@@ -443,8 +439,8 @@ func main() {
 		glog.V(2).Infof("Request: %s", r.URL)
 		glog.V(2).Infof("Total samples: %d", cluster.Archive.Len())
 
-		// TODO(nnielsen): Support 'from' field, specifying samples in time range to serve.
-		// TODO(nnielsen): Support 'limit' field. Default limit should be 1.
+		// TODO(nnielsen): Support 'from' and 'to' fields, specifying samples in time range to serve.
+		// TODO(nnielsen): Support 'limit' field. Default limit should be 10.
 		c := make([]*ClusterStateJson, 0)
 
 		cluster.ArchiveLock.RLock()
