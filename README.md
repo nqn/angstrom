@@ -5,6 +5,17 @@ Scalable, self-hosted metrics collection and global cluster state for Mesos.
 
 ![Ångström](http://cl.ly/image/3P2301053q1a/angstrom.png)
 
+
+## Build instructions
+
+```bash
+$ go get github.com/nqn/angstrom/{scheduler, executor}
+```
+
+## API
+
+http://_angstrom framework ip_:9000/resources
+
 ```json
 {
 	"cluster": {
