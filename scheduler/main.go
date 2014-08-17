@@ -58,9 +58,7 @@ type Framework struct {
 	Executors map[string]*Executor
 }
 
-// TODO(nnielsen): Create struct for cpu, memory and disk stats.
-type Cluster struct {
-	Master string
+type ClusterSample struct {
 	Cpus float64
 	Memory float64
 	Disk float64
@@ -75,18 +73,32 @@ type Cluster struct {
 	SlackDisk float64
 	Slaves map[string]*Slave
 	Frameworks map[string]*Framework
+	Timestamp int64
+}
+
+// TODO(nnielsen): Create struct for cpu, memory and disk stats.
+type Cluster struct {
+	Master string
+	Sample *ClusterSample
+	Archive list.List
 }
 
 func NewCluster(master string) *Cluster {
 	return &Cluster {
 		Master: master,
-		Slaves: make(map[string]*Slave),
-		Frameworks: make(map[string]*Framework),
 	}
 }
 
 func (c *Cluster) Update() {
-	// TODO(nnielsen): Don't trash old statistics, but append.
+	if c.Sample != nil {
+		c.Archive.PushBack(c.Sample)
+		// TODO(nnielsen): Only keep X recent samples around.
+	}
+
+	c.Sample = &ClusterSample {
+		Slaves: make(map[string]*Slave),
+		Frameworks: make(map[string]*Framework),
+	}
 
 	resp, err := http.Get("http://" + c.Master + "/master/state.json")
 	if err != nil {
@@ -104,17 +116,19 @@ func (c *Cluster) Update() {
 		glog.Fatalf("Error deserializing RenderResult from JSON: " + err.Error())
 	}
 
-	c.Cpus = 0.0
-	c.Memory = 0
-	c.Disk = 0
+	sample := c.Sample
+
+	sample.Cpus = 0.0
+	sample.Memory = 0
+	sample.Disk = 0
 	for _, slave := range target.Slaves {
 		slaveCPUs := slave.Resources["cpus"].(float64)
 		slaveMemory := slave.Resources["mem"].(float64)
 		slaveDisk := slave.Resources["disk"].(float64)
 
-		c.Cpus += slaveCPUs
-		c.Memory += slaveMemory
-		c.Disk += slaveDisk
+		sample.Cpus += slaveCPUs
+		sample.Memory += slaveMemory
+		sample.Disk += slaveDisk
 
 		pidSplit := strings.Split(slave.Pid, "@")
 		hostPort := pidSplit[1]
@@ -123,13 +137,13 @@ func (c *Cluster) Update() {
 		hostname := hostSplit[0]
 		port, err := strconv.Atoi(hostSplit[1])
 		if err == nil {
-			c.Slaves[slave.Id] = &Slave { Hostname: hostname, Port: port }
+			sample.Slaves[slave.Id] = &Slave { Hostname: hostname, Port: port }
 		}
 	}
 
-	c.AllocatedCpus = 0.0
-	c.AllocatedMemory = 0
-	c.AllocatedDisk = 0
+	sample.AllocatedCpus = 0.0
+	sample.AllocatedMemory = 0
+	sample.AllocatedDisk = 0
 	activeFrameworks := make(map[string]struct{})
 	for _, framework := range target.Frameworks {
 		activeFrameworks[framework.Id] = struct{}{}
@@ -138,30 +152,33 @@ func (c *Cluster) Update() {
 		frameworkMemory := framework.Resources["mem"].(float64)
 		frameworkDisk := framework.Resources["disk"].(float64)
 
-		c.AllocatedCpus += frameworkCPUs
-		c.AllocatedMemory += frameworkMemory
-		c.AllocatedDisk += frameworkDisk
+		sample.AllocatedCpus += frameworkCPUs
+		sample.AllocatedMemory += frameworkMemory
+		sample.AllocatedDisk += frameworkDisk
 	}
 
-	c.UsedCpus = 0.0
-	c.UsedMemory = 0
-	c.UsedDisk = 0
-	for frameworkId, framework := range c.Frameworks {
+	sample.UsedCpus = 0.0
+	sample.UsedMemory = 0
+	sample.UsedDisk = 0
+	for frameworkId, framework := range sample.Frameworks {
 		if _, ok := activeFrameworks[frameworkId] ; ! ok {
 			glog.V(2).Infof("Removing inactive framework: " + frameworkId)
-			delete(c.Frameworks, frameworkId)
+			delete(sample.Frameworks, frameworkId)
 		} else {
 			for _, executor := range framework.Executors {
-				c.UsedCpus += executor.Cpus
-				c.UsedMemory += executor.Memory
+				sample.UsedCpus += executor.Cpus
+				sample.UsedMemory += executor.Memory
 			}
 		}
 	}
 
 	// Compute slack.
-	c.SlackCpus = c.AllocatedCpus - c.UsedCpus
-	c.SlackMemory = c.AllocatedMemory - c.UsedMemory
-	c.SlackDisk = c.AllocatedDisk - c.UsedDisk
+	sample.SlackCpus = sample.AllocatedCpus - sample.UsedCpus
+	sample.SlackMemory = sample.AllocatedMemory - sample.UsedMemory
+	sample.SlackDisk = sample.AllocatedDisk - sample.UsedDisk
+
+	// Set timestamp.
+	sample.Timestamp = time.Now().Unix()
 }
 
 type ClusterStateJson struct {
@@ -189,6 +206,8 @@ type ClusterStateJson struct {
 	SlackMemoryPercent float64
 	SlackDisk float64
 	SlackDiskPercent float64
+
+	Timestamp int64
 }
 
 func main() {
@@ -269,7 +288,7 @@ func main() {
 	}()
 
 	slaves := list.New()
-	for _, slave := range cluster.Slaves {
+	for _, slave := range cluster.Sample.Slaves {
 		slaveHostname := slave.Hostname + ":" + strconv.Itoa(slave.Port)
 		slaves.PushBack(slaveHostname)
 	}
@@ -338,11 +357,11 @@ func main() {
 					executorId := stat.ExecutorId + ":" + slaveId.GetValue()
 
 					var framework *Framework
-					if f, ok := cluster.Frameworks[frameworkId] ; !ok {
+					if f, ok := cluster.Sample.Frameworks[frameworkId] ; !ok {
 						f = &Framework{
 							Executors: make(map[string]*Executor),
 						}
-						cluster.Frameworks[frameworkId] = f
+						cluster.Sample.Frameworks[frameworkId] = f
 						framework = f
 					} else {
 						framework = f
@@ -395,33 +414,41 @@ func main() {
 			return (a / b) * 100
 		}
 
+		glog.V(2).Infof("Total samples: %d", cluster.Archive.Len())
+
 		// TODO(nnielsen): Support 'from' field, specifying samples in time range to serve.
-		cluster := &ClusterStateJson {
-			TotalCpus: cluster.Cpus,
-			TotalMemory: cluster.Memory,
-			TotalDisk: cluster.Disk,
-			AllocatedCpus: cluster.AllocatedCpus,
-			AllocatedCpusPercent: percentOf(cluster.AllocatedCpus, cluster.Cpus),
-			AllocatedMemory: cluster.AllocatedMemory,
-			AllocatedMemoryPercent: percentOf(cluster.AllocatedMemory, cluster.Memory),
-			AllocatedDisk: cluster.AllocatedDisk,
-			AllocatedDiskPercent: percentOf(cluster.AllocatedDisk, cluster.Disk),
-			UsedCpus: cluster.UsedCpus,
-			UsedCpusPercent: percentOf(cluster.UsedCpus, cluster.Cpus),
-			UsedMemory: cluster.UsedMemory,
-			UsedMemoryPercent: percentOf(cluster.UsedMemory, cluster.Memory),
-			UsedDisk: cluster.UsedDisk,
-			UsedDiskPercent: percentOf(cluster.UsedDisk, cluster.Disk),
-			SlackCpus: cluster.SlackCpus,
-			SlackCpusPercent: percentOf(cluster.SlackCpus, cluster.Cpus),
-			SlackMemory: cluster.SlackMemory,
-			SlackMemoryPercent: percentOf(cluster.SlackMemory, cluster.Memory),
-			SlackDisk: cluster.SlackDisk,
-			SlackDiskPercent: percentOf(cluster.SlackDisk, cluster.Disk),
+		c := make([]*ClusterStateJson, 0)
+
+		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
+			sample := e.Value.(*ClusterSample)
+			c = append(c, &ClusterStateJson {
+				TotalCpus: sample.Cpus,
+				TotalMemory: sample.Memory,
+				TotalDisk: sample.Disk,
+				AllocatedCpus: sample.AllocatedCpus,
+				AllocatedCpusPercent: percentOf(sample.AllocatedCpus, sample.Cpus),
+				AllocatedMemory: sample.AllocatedMemory,
+				AllocatedMemoryPercent: percentOf(sample.AllocatedMemory, sample.Memory),
+				AllocatedDisk: sample.AllocatedDisk,
+				AllocatedDiskPercent: percentOf(sample.AllocatedDisk, sample.Disk),
+				UsedCpus: sample.UsedCpus,
+				UsedCpusPercent: percentOf(sample.UsedCpus, sample.Cpus),
+				UsedMemory: sample.UsedMemory,
+				UsedMemoryPercent: percentOf(sample.UsedMemory, sample.Memory),
+				UsedDisk: sample.UsedDisk,
+				UsedDiskPercent: percentOf(sample.UsedDisk, sample.Disk),
+				SlackCpus: sample.SlackCpus,
+				SlackCpusPercent: percentOf(sample.SlackCpus, sample.Cpus),
+				SlackMemory: sample.SlackMemory,
+				SlackMemoryPercent: percentOf(sample.SlackMemory, sample.Memory),
+				SlackDisk: sample.SlackDisk,
+				SlackDiskPercent: percentOf(sample.SlackDisk, sample.Disk),
+				Timestamp: sample.Timestamp,
+			})
 		}
 
-		state := make(map[string]*ClusterStateJson)
-		state["cluster"] = cluster
+		state := make(map[string][]*ClusterStateJson)
+		state["cluster"] = c
 
 		body, err := json.Marshal(state)
 		if err == nil {

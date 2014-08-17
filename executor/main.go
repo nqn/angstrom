@@ -60,6 +60,7 @@ func taskHandler(driver *mesos.ExecutorDriver, taskInfo mesos.TaskInfo) {
 				continue
 			}
 
+			// TODO(nnielsen): Do local aggregation so samples can be sent in bulks.
 			// TODO(nnielsen): Return type should be (node_count, available, allocated, used).
 			body, err := json.Marshal(samples)
 			if err != nil {
@@ -67,8 +68,6 @@ func taskHandler(driver *mesos.ExecutorDriver, taskInfo mesos.TaskInfo) {
 			}
 			log.Println("Sending framework data...")
 			driver.SendFrameworkMessage(string(body))
-
-			// TODO(nnielsen): Do local aggregation for finer grained samples.
 
 			// TODO(nnielsen): Add terminal state.
 			// driver.SendStatusUpdate(&mesos.TaskStatus{
