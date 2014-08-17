@@ -70,6 +70,9 @@ type Cluster struct {
 	UsedCpus float64
 	UsedMemory float64
 	UsedDisk float64
+	SlackCpus float64
+	SlackMemory float64
+	SlackDisk float64
 	Slaves map[string]*Slave
 	Frameworks map[string]*Framework
 }
@@ -83,6 +86,8 @@ func NewCluster(master string) *Cluster {
 }
 
 func (c *Cluster) Update() {
+	// TODO(nnielsen): Don't trash old statistics, but append.
+
 	resp, err := http.Get("http://" + c.Master + "/master/state.json")
 	if err != nil {
 		log.Panic("Cannot get slave list from master '" + c.Master + "'")
@@ -152,6 +157,13 @@ func (c *Cluster) Update() {
 			}
 		}
 	}
+
+	// Compute slack.
+	c.SlackCpus = c.AllocatedCpus - c.UsedCpus
+	c.SlackMemory = c.AllocatedMemory - c.UsedMemory
+	c.SlackDisk = c.AllocatedDisk - c.UsedDisk
+
+	// Compute percentages.
 }
 
 type ClusterStateJson struct {
@@ -378,6 +390,7 @@ func main() {
 	driver.Start()
 
 	http.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
+		// TODO(nnielsen): Support 'from' field, specifying samples in time range to serve.
 		cluster := &ClusterStateJson {
 			TotalCpus: cluster.Cpus,
 			TotalMemory: cluster.Memory,
@@ -388,6 +401,9 @@ func main() {
 			UsedCpus: cluster.UsedCpus,
 			UsedMemory: cluster.UsedMemory,
 			UsedDisk: cluster.UsedDisk,
+			SlackCpus: cluster.SlackCpus,
+			SlackMemory: cluster.SlackMemory,
+			SlackDisk: cluster.SlackDisk,
 		}
 
 		state := make(map[string]*ClusterStateJson)
