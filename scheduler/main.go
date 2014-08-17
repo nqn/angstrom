@@ -57,6 +57,7 @@ type Framework struct {
 	Executors map[string]*Executor
 }
 
+// TODO(nnielsen): Create struct for cpu, memory and disk stats.
 type Cluster struct {
 	Master string
 	Cpus float64
@@ -150,8 +151,6 @@ func (c *Cluster) Update() {
 			}
 		}
 	}
-
-	// TODO(nnielsen): Update used statistics.
 }
 
 type ClusterStateJson struct {
@@ -345,6 +344,8 @@ func main() {
 			UsedMemory: cluster.UsedMemory,
 			UsedDisk: cluster.UsedDisk,
 		}
+
+		state := make(map[string]ClusterStateJson)
 
 		body, err := json.Marshal(state)
 		if err == nil {
