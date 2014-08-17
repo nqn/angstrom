@@ -7,6 +7,7 @@ import (
 	"github.com/mesosphere/mesos-go/mesos"
 	"strconv"
 	"time"
+	"sync"
 	"net"
 	"encoding/json"
 	"io/ioutil"
@@ -17,6 +18,12 @@ import (
 	"net/http"
 	"github.com/golang/glog"
 )
+
+const archiveMaxSize = 2048
+const defaultPort = 9000
+
+
+// TODO(nnielsen): Move payload structs to separate json package.
 
 type MasterInfo struct {
 	Slaves []SlaveInfo `json:"slaves"`
@@ -34,17 +41,19 @@ type FrameworkInfo struct {
 	Resources map[string]interface{} `json:"Resources"`
 }
 
-type Slave struct {
-	Hostname string
-	Port int
-}
-
 type StatisticsInfo struct {
 	ExecutorId string `json:"executor_id"`
 	ExecutorName string `json:"executor_name"`
 	FrameworkId string `json:"framework_id"`
 	Source string `json:"source"`
 	Statistics map[string]interface{}
+}
+
+
+// TODO(nnielsen): Move Slave, Executor, Framework, ClusterSample and Cluster to separate Cluster package.
+type Slave struct {
+	Hostname string
+	Port int
 }
 
 type Executor struct {
@@ -58,6 +67,7 @@ type Framework struct {
 	Executors map[string]*Executor
 }
 
+// TODO(nnielsen): Create struct for cpu, memory and disk stats.
 type ClusterSample struct {
 	Cpus float64
 	Memory float64
@@ -76,23 +86,39 @@ type ClusterSample struct {
 	Timestamp int64
 }
 
-// TODO(nnielsen): Create struct for cpu, memory and disk stats.
 type Cluster struct {
 	Master string
 	Sample *ClusterSample
 	Archive list.List
+	ArchiveLock *sync.RWMutex
 }
 
 func NewCluster(master string) *Cluster {
 	return &Cluster {
 		Master: master,
+		ArchiveLock: &sync.RWMutex{},
 	}
 }
 
 func (c *Cluster) Update() {
 	if c.Sample != nil {
+		// TODO(nnielsen): Guard archive list with mutex.
+		// Currently not safe taken HTTP endpoint traverse archive.
+
+		c.ArchiveLock.Lock()
+
 		c.Archive.PushBack(c.Sample)
-		// TODO(nnielsen): Only keep X recent samples around.
+
+		// Only keep archiveMaxSize sampels around.
+		archiveSize := c.Archive.Len()
+		if archiveSize > archiveMaxSize {
+			remove := archiveSize - archiveMaxSize
+			for i := 0; i < remove; i++ {
+				c.Archive.Remove(c.Archive.Front())
+			}
+		}
+
+		c.ArchiveLock.Unlock()
 	}
 
 	c.Sample = &ClusterSample {
@@ -253,7 +279,7 @@ func main() {
 		}
 		serveFile("/"+base, path)
 
-		hostURI := fmt.Sprintf("http://%s:%d/%s", *address, 9000, base)
+		hostURI := fmt.Sprintf("http://%s:%d/%s", *address, defaultPort, base)
 
 		glog.V(2).Infof("Serving '%s'\n", hostURI)
 
@@ -414,11 +440,14 @@ func main() {
 			return (a / b) * 100
 		}
 
+		glog.V(2).Infof("Request: %s", r.URL)
 		glog.V(2).Infof("Total samples: %d", cluster.Archive.Len())
 
 		// TODO(nnielsen): Support 'from' field, specifying samples in time range to serve.
+		// TODO(nnielsen): Support 'limit' field. Default limit should be 1.
 		c := make([]*ClusterStateJson, 0)
 
+		cluster.ArchiveLock.RLock()
 		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
 			sample := e.Value.(*ClusterSample)
 			c = append(c, &ClusterStateJson {
@@ -446,6 +475,7 @@ func main() {
 				Timestamp: sample.Timestamp,
 			})
 		}
+		cluster.ArchiveLock.RUnlock()
 
 		state := make(map[string][]*ClusterStateJson)
 		state["cluster"] = c
@@ -456,7 +486,7 @@ func main() {
 		}
 	})
 
-	http.ListenAndServe(":9000", nil)
+	http.ListenAndServe(":" + strconv.Itoa(defaultPort), nil)
 	driver.Join()
 }
 
