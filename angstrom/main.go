@@ -29,9 +29,12 @@ func main() {
 	localExecutor, _ := executorPath()
 	hostname, _ := os.Hostname()
 
+	goPath := os.Getenv("GOPATH") + "/"
+
 	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
 	executorPath := flag.String("executor-uri", localExecutor, "Path to executor executable")
 	address := flag.String("address", hostname, "Hostname to serve artifacts from")
+	angstromPath := flag.String("angstrom-path", goPath + "src/github.com/nqn/angstrom", "Path to angstrom checkout")
 
 	flag.Parse()
 
@@ -317,6 +320,8 @@ func main() {
 			fmt.Fprintf(w, "%s", body)
 		}
 	})
+
+	http.Handle("/", http.FileServer(http.Dir(*angstromPath + "/assets")))
 
 	http.ListenAndServe(":" + strconv.Itoa(defaultPort), nil)
 	driver.Join()
