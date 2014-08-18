@@ -22,6 +22,7 @@ import (
 )
 
 const defaultPort = 9000
+const defaultSampleLimit = 10
 
 func main() {
 	taskId := 0
@@ -80,7 +81,7 @@ func main() {
 	executor := &mesos.ExecutorInfo{
 		ExecutorId: &mesos.ExecutorID{Value: proto.String("default")},
 		Command: &mesos.CommandInfo{
-			Value: proto.String("./executor"),
+			Value: proto.String("./angstrom-executor"),
 			Uris: []*mesos.CommandInfo_URI{
 				&mesos.CommandInfo_URI{Value: &executorURI, Executable: &executable},
 			},
@@ -233,7 +234,7 @@ func main() {
 		glog.V(2).Infof("Request: %s", r.URL)
 		glog.V(2).Infof("Total samples: %d", cluster.Archive.Len())
 
-		var limit int64 = 10
+		var limit int64 = defaultSampleLimit
 		var from int64 = 0
 		var to int64 = math.MaxInt64
 
@@ -272,6 +273,8 @@ func main() {
 		cluster.ArchiveLock.RLock()
 		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
 			sample := e.Value.(*acluster.ClusterSample)
+
+			// TODO(nnielsen): Separate into payload package.
 
 			if (sample.Timestamp < from) || (sample.Timestamp > to) || (sampleCount >= limit) {
 				continue

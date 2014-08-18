@@ -9,7 +9,8 @@ Scalable, self-hosted metrics collection and global cluster state for Mesos.
 ## Build instructions
 
 ```bash
-$ go get github.com/nqn/angstrom/{scheduler,executor}
+$ go get github.com/nqn/angstrom/{angstrom,angstrom-executor}
+$ $(GOPATH)/bin/angstrom -master <mesos-master-ip:port>
 ```
 
 ## API
