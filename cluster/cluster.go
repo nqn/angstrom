@@ -66,6 +66,9 @@ func NewCluster(master string) *Cluster {
 }
 
 func (c *Cluster) Update() {
+	// TODO(nnielsen): Post-pone sample if insufficient usage data has been presented.
+	// TODO(nnielsen): Report sample accuracy / coverage.
+
 	if c.Sample != nil {
 		c.ArchiveLock.Lock()
 		c.Archive.PushBack(c.Sample)
