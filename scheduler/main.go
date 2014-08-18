@@ -8,231 +8,20 @@ import (
 	"strconv"
 	"time"
 	"math"
-	"sync"
 	"net"
 	"encoding/json"
-	"io/ioutil"
 	"strings"
 	"container/list"
 	"os"
 	"path/filepath"
 	"net/http"
 	"github.com/golang/glog"
+	"github.com/nqn/angstrom/payload"
+	acluster "github.com/nqn/angstrom/cluster"
 	"net/url"
 )
 
-const archiveMaxSize = 2048
 const defaultPort = 9000
-
-
-// TODO(nnielsen): Move payload structs to separate json package.
-
-type MasterInfo struct {
-	Slaves []SlaveInfo `json:"slaves"`
-	Frameworks []FrameworkInfo `json:"frameworks"`
-}
-
-type SlaveInfo struct {
-	Pid string `json:"pid"`
-	Id string `json:"id"`
-	Resources map[string]interface{} `json:"Resources"`
-}
-
-type FrameworkInfo struct {
-	Id string `json:"id"`
-	Resources map[string]interface{} `json:"Resources"`
-}
-
-type StatisticsInfo struct {
-	ExecutorId string `json:"executor_id"`
-	ExecutorName string `json:"executor_name"`
-	FrameworkId string `json:"framework_id"`
-	Source string `json:"source"`
-	Statistics map[string]interface{}
-}
-
-
-// TODO(nnielsen): Move Slave, Executor, Framework, ClusterSample and Cluster to separate Cluster package.
-type Slave struct {
-	Hostname string
-	Port int
-}
-
-type Executor struct {
-	Stat StatisticsInfo
-	Cpus float64
-	Memory float64
-	Disk float64
-}
-
-type Framework struct {
-	Executors map[string]*Executor
-}
-
-// TODO(nnielsen): Create struct for cpu, memory and disk stats.
-type ClusterSample struct {
-	Cpus float64
-	Memory float64
-	Disk float64
-	AllocatedCpus float64
-	AllocatedMemory float64
-	AllocatedDisk float64
-	UsedCpus float64
-	UsedMemory float64
-	UsedDisk float64
-	SlackCpus float64
-	SlackMemory float64
-	SlackDisk float64
-	Slaves map[string]*Slave
-	Frameworks map[string]*Framework
-	Timestamp int64
-}
-
-type Cluster struct {
-	Master string
-	Sample *ClusterSample
-	Archive list.List
-	ArchiveLock *sync.RWMutex
-}
-
-func NewCluster(master string) *Cluster {
-	return &Cluster {
-		Master: master,
-		ArchiveLock: &sync.RWMutex{},
-	}
-}
-
-func (c *Cluster) Update() {
-	if c.Sample != nil {
-		c.ArchiveLock.Lock()
-		c.Archive.PushBack(c.Sample)
-
-		// Only keep archiveMaxSize sampels around.
-		archiveSize := c.Archive.Len()
-		if archiveSize > archiveMaxSize {
-			remove := archiveSize - archiveMaxSize
-			for i := 0; i < remove; i++ {
-				c.Archive.Remove(c.Archive.Front())
-			}
-		}
-
-		c.ArchiveLock.Unlock()
-	}
-
-	c.Sample = &ClusterSample {
-		Slaves: make(map[string]*Slave),
-		Frameworks: make(map[string]*Framework),
-	}
-
-	resp, err := http.Get("http://" + c.Master + "/master/state.json")
-	if err != nil {
-		glog.Fatalf("Cannot get slave list from master '" + c.Master + "'")
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Warning("Error reading response")
-	}
-
-	var target MasterInfo
-	err = json.Unmarshal(body, &target)
-	if err != nil {
-		glog.Fatalf("Error deserializing RenderResult from JSON: " + err.Error())
-	}
-
-	sample := c.Sample
-
-	sample.Cpus = 0.0
-	sample.Memory = 0
-	sample.Disk = 0
-	for _, slave := range target.Slaves {
-		slaveCPUs := slave.Resources["cpus"].(float64)
-		slaveMemory := slave.Resources["mem"].(float64)
-		slaveDisk := slave.Resources["disk"].(float64)
-
-		sample.Cpus += slaveCPUs
-		sample.Memory += slaveMemory
-		sample.Disk += slaveDisk
-
-		pidSplit := strings.Split(slave.Pid, "@")
-		hostPort := pidSplit[1]
-		hostSplit := strings.Split(hostPort, ":")
-
-		hostname := hostSplit[0]
-		port, err := strconv.Atoi(hostSplit[1])
-		if err == nil {
-			sample.Slaves[slave.Id] = &Slave { Hostname: hostname, Port: port }
-		}
-	}
-
-	sample.AllocatedCpus = 0.0
-	sample.AllocatedMemory = 0
-	sample.AllocatedDisk = 0
-	activeFrameworks := make(map[string]struct{})
-	for _, framework := range target.Frameworks {
-		activeFrameworks[framework.Id] = struct{}{}
-
-		frameworkCPUs := framework.Resources["cpus"].(float64)
-		frameworkMemory := framework.Resources["mem"].(float64)
-		frameworkDisk := framework.Resources["disk"].(float64)
-
-		sample.AllocatedCpus += frameworkCPUs
-		sample.AllocatedMemory += frameworkMemory
-		sample.AllocatedDisk += frameworkDisk
-	}
-
-	sample.UsedCpus = 0.0
-	sample.UsedMemory = 0
-	sample.UsedDisk = 0
-	for frameworkId, framework := range sample.Frameworks {
-		if _, ok := activeFrameworks[frameworkId] ; ! ok {
-			glog.V(2).Infof("Removing inactive framework: " + frameworkId)
-			delete(sample.Frameworks, frameworkId)
-		} else {
-			for _, executor := range framework.Executors {
-				sample.UsedCpus += executor.Cpus
-				sample.UsedMemory += executor.Memory
-			}
-		}
-	}
-
-	// Compute slack.
-	sample.SlackCpus = sample.AllocatedCpus - sample.UsedCpus
-	sample.SlackMemory = sample.AllocatedMemory - sample.UsedMemory
-	sample.SlackDisk = sample.AllocatedDisk - sample.UsedDisk
-
-	// Set timestamp.
-	sample.Timestamp = time.Now().Unix()
-}
-
-type ClusterStateJson struct {
-	TotalCpus float64
-	TotalMemory float64
-	TotalDisk float64
-
-	AllocatedCpus float64
-	AllocatedCpusPercent float64
-	AllocatedMemory float64
-	AllocatedMemoryPercent float64
-	AllocatedDisk float64
-	AllocatedDiskPercent float64
-
-	UsedCpus float64
-	UsedCpusPercent float64
-	UsedMemory float64
-	UsedMemoryPercent float64
-	UsedDisk float64
-	UsedDiskPercent float64
-
-	SlackCpus float64
-	SlackCpusPercent float64
-	SlackMemory float64
-	SlackMemoryPercent float64
-	SlackDisk float64
-	SlackDiskPercent float64
-
-	Timestamp int64
-}
 
 func main() {
 	taskId := 0
@@ -245,6 +34,7 @@ func main() {
 
 	flag.Parse()
 
+	// TODO(nnielsen): Hide in helper.
 	// Determine address to listen on.
 	interfaces, _ := net.Interfaces()
 	for _, inter := range interfaces {
@@ -295,11 +85,11 @@ func main() {
 				&mesos.CommandInfo_URI{Value: &executorURI, Executable: &executable},
 			},
 		},
-		Name:   proto.String("Test Executor (Go)"),
-		Source: proto.String("go_test"),
+		Name:   proto.String("Angstrom Executor"),
+		Source: proto.String("angstrom"),
 	}
 
-	cluster := NewCluster(*master)
+	cluster := acluster.NewCluster(*master)
 
 	cluster.Update()
 
@@ -367,8 +157,9 @@ func main() {
 			},
 
 			FrameworkMessage: func(driver *mesos.SchedulerDriver, _executorId mesos.ExecutorID, slaveId mesos.SlaveID, data string) {
+				// TODO(nnielsen): Move to cluster package.
 				// TODO(nnielsen): Compute error.
-				var target []StatisticsInfo
+				var target []payload.StatisticsInfo
 				err := json.Unmarshal([]byte(data), &target)
 				if err != nil {
 					return
@@ -380,10 +171,10 @@ func main() {
 					// TODO(nnielsen): Hack for now, we need to hang monitored slaves id off stats payload.
 					executorId := stat.ExecutorId + ":" + slaveId.GetValue()
 
-					var framework *Framework
+					var framework *acluster.Framework
 					if f, ok := cluster.Sample.Frameworks[frameworkId] ; !ok {
-						f = &Framework{
-							Executors: make(map[string]*Executor),
+						f = &acluster.Framework{
+							Executors: make(map[string]*acluster.Executor),
 						}
 						cluster.Sample.Frameworks[frameworkId] = f
 						framework = f
@@ -391,9 +182,9 @@ func main() {
 						framework = f
 					}
 
-					var executor *Executor
+					var executor *acluster.Executor
 					if e, ok := framework.Executors[executorId] ; !ok {
-						e = &Executor {}
+						e = &acluster.Executor {}
 						framework.Executors[executorId] = e
 						executor = e
 					} else {
@@ -433,6 +224,7 @@ func main() {
 
 	driver.Start()
 
+	// TODO(nnielsen): Separate HTTP handling into package.
 	http.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
 		percentOf := func(a float64, b float64) float64 {
 			return (a / b) * 100
@@ -474,12 +266,12 @@ func main() {
 
 		}
 
-		c := make([]*ClusterStateJson, 0)
+		c := make([]*payload.ClusterStateJson, 0)
 
 		var sampleCount int64 = 0
 		cluster.ArchiveLock.RLock()
 		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
-			sample := e.Value.(*ClusterSample)
+			sample := e.Value.(*acluster.ClusterSample)
 
 			if (sample.Timestamp < from) || (sample.Timestamp > to) || (sampleCount >= limit) {
 				continue
@@ -487,7 +279,7 @@ func main() {
 
 			sampleCount++
 
-			c = append(c, &ClusterStateJson {
+			c = append(c, &payload.ClusterStateJson {
 				TotalCpus: sample.Cpus,
 				TotalMemory: sample.Memory,
 				TotalDisk: sample.Disk,
@@ -514,7 +306,7 @@ func main() {
 		}
 		cluster.ArchiveLock.RUnlock()
 
-		state := make(map[string][]*ClusterStateJson)
+		state := make(map[string][]*payload.ClusterStateJson)
 		state["cluster"] = c
 
 		body, err := json.Marshal(state)

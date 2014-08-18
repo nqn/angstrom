@@ -10,22 +10,10 @@ import (
 
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/mesosphere/mesos-go/mesos"
+	"github.com/nqn/angstrom/payload"
 )
 
-type StatisticsInfo struct {
-	ExecutorId string `json:"executor_id"`
-	ExecutorName string `json:"executor_name"`
-	FrameworkId string `json:"framework_id"`
-	Source string `json:"source"`
-	Statistics map[string]interface{}
-}
-
-type SampleRequest struct {
-	Slave string `json:"slave"`
-}
-
-
-func sample(slave string) *[]StatisticsInfo {
+func sample(slave string) *[]payload.StatisticsInfo {
 	resp, err := http.Get("http://" + slave + "/monitor/statistics.json")
 	if err != nil {
 		log.Panic("Cannot get statistics from slave: '" + slave + "'")
@@ -36,7 +24,7 @@ func sample(slave string) *[]StatisticsInfo {
 		fmt.Printf("Error reading response")
 	}
 
-	var monitor []StatisticsInfo
+	var monitor []payload.StatisticsInfo
 	err = json.Unmarshal(body, &monitor)
 	if err != nil {
 		log.Println("Could not parse monitor: " + err.Error())
@@ -48,7 +36,7 @@ func sample(slave string) *[]StatisticsInfo {
 
 func taskHandler(driver *mesos.ExecutorDriver, taskInfo mesos.TaskInfo) {
 	for {
-		var request SampleRequest
+		var request payload.SampleRequest
 		err := json.Unmarshal(taskInfo.Data, &request)
 		if err != nil {
 			log.Println("Could not parse request: " + err.Error())
