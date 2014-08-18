@@ -446,12 +446,34 @@ func main() {
 		var to int64 = math.MaxInt64
 
 		query, err := url.ParseQuery(r.URL.RawQuery)
-		if err != nil {
-			glog.V(2).Infof("%v", query)
+		if err == nil {
+			integerField := func(field string) (int64, bool) {
+				arr, ok := query[field] ; if ok {
+					if len(arr) > 0 {
+						val := arr[0]
+						ival, err := strconv.ParseInt(val, 10, 64)
+						if err == nil {
+							return ival, true
+						}
+					}
+				}
+				return 0, false
+			}
+
+			if val, ok := integerField("limit") ; ok {
+				limit = val
+			}
+
+			if val, ok := integerField("from") ; ok {
+				from = val
+			}
+
+			if val, ok := integerField("to") ; ok {
+				to = val
+			}
+
 		}
 
-		// TODO(nnielsen): Support 'from' and 'to' fields, specifying samples in time range to serve.
-		// TODO(nnielsen): Support 'limit' field. Default limit should be 10.
 		c := make([]*ClusterStateJson, 0)
 
 		var sampleCount int64 = 0
@@ -459,7 +481,7 @@ func main() {
 		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
 			sample := e.Value.(*ClusterSample)
 
-			if (sample.Timestamp < from) || (sample.Timestamp > to) || (sampleCount > limit) {
+			if (sample.Timestamp < from) || (sample.Timestamp > to) || (sampleCount >= limit) {
 				continue
 			}
 
