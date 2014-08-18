@@ -13,6 +13,10 @@ $ go get github.com/nqn/angstrom/{angstrom,angstrom-executor}
 $ $(GOPATH)/bin/angstrom -master <mesos-master-ip:port>
 ```
 
+## WebUI
+
+`http://<angstrom framework ip>:9000/`
+
 ## API
 
 `http://<angstrom framework ip>:9000/resources(?limit=10&from=timestamp&to=timestamp)`
