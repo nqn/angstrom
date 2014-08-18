@@ -14,7 +14,7 @@ $ go get github.com/nqn/angstrom/{scheduler,executor}
 
 ## API
 
-http://_angstrom framework ip_:9000/resources
+`http://<angstrom framework ip>:9000/resources(?limit=10&from=timestamp&to=timestamp)`
 
 ```json
 {
