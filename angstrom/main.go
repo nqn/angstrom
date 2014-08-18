@@ -162,6 +162,7 @@ func main() {
 
 			FrameworkMessage: func(driver *mesos.SchedulerDriver, _executorId mesos.ExecutorID, slaveId mesos.SlaveID, data string) {
 				// TODO(nnielsen): Move to cluster package.
+
 				// TODO(nnielsen): Compute error.
 				var target []payload.StatisticsInfo
 				err := json.Unmarshal([]byte(data), &target)
@@ -169,49 +170,7 @@ func main() {
 					return
 				}
 
-				for _, stat := range target {
-					frameworkId := stat.FrameworkId
-
-					// TODO(nnielsen): Hack for now, we need to hang monitored slaves id off stats payload.
-					executorId := stat.ExecutorId + ":" + slaveId.GetValue()
-
-					var framework *acluster.Framework
-					if f, ok := cluster.Sample.Frameworks[frameworkId] ; !ok {
-						f = &acluster.Framework{
-							Executors: make(map[string]*acluster.Executor),
-						}
-						cluster.Sample.Frameworks[frameworkId] = f
-						framework = f
-					} else {
-						framework = f
-					}
-
-					var executor *acluster.Executor
-					if e, ok := framework.Executors[executorId] ; !ok {
-						e = &acluster.Executor {}
-						framework.Executors[executorId] = e
-						executor = e
-					} else {
-						executor = e
-
-						// TODO(nnielsen): Save # samples.
-						// Compute new values since last sample.
-
-						limit := e.Stat.Statistics["cpus_limit"].(float64)
-						_ = limit
-
-						totalTime := stat.Statistics["timestamp"].(float64) - e.Stat.Statistics["timestamp"].(float64)
-						userTime := stat.Statistics["cpus_user_time_secs"].(float64) - e.Stat.Statistics["cpus_user_time_secs"].(float64)
-						systemTime := stat.Statistics["cpus_system_time_secs"].(float64) - e.Stat.Statistics["cpus_system_time_secs"].(float64)
-
-						executor.Cpus = (userTime + systemTime) / totalTime
-						executor.Memory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
-					}
-
-					glog.V(2).Info(stat)
-
-					executor.Stat = stat
-				}
+				cluster.AddSlaveSamples(slaveId, target)
 			},
 
 			StatusUpdate: func(driver *mesos.SchedulerDriver, status mesos.TaskStatus) {
@@ -321,6 +280,7 @@ func main() {
 		}
 	})
 
+	// Serve Web UI.
 	http.Handle("/", http.FileServer(http.Dir(*angstromPath + "/assets")))
 
 	http.ListenAndServe(":" + strconv.Itoa(defaultPort), nil)
@@ -333,6 +293,6 @@ func executorPath() (string, error) {
 		return "", err
 	}
 
-	path := dir + "/executor"
+	path := dir + "/angstrom-executor"
 	return path, nil
 }

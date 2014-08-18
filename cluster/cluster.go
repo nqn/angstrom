@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"sync"
 	"github.com/nqn/angstrom/payload"
+	"github.com/mesosphere/mesos-go/mesos"
 	"net/http"
 	"github.com/golang/glog"
 	"io/ioutil"
@@ -163,7 +164,53 @@ func (c *Cluster) Update() {
 	sample.SlackMemory = sample.AllocatedMemory - sample.UsedMemory
 	sample.SlackDisk = sample.AllocatedDisk - sample.UsedDisk
 
+	// TODO(nnielsen): Increase timestamp resolution.
 	// Set timestamp.
 	sample.Timestamp = time.Now().Unix()
 }
 
+func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.StatisticsInfo) {
+	for _, stat := range target {
+		frameworkId := stat.FrameworkId
+
+		// TODO(nnielsen): Hack for now, we need to hang monitored slaves id off stats payload.
+		executorId := stat.ExecutorId + ":" + slaveId.GetValue()
+
+		var framework *Framework
+		if f, ok := c.Sample.Frameworks[frameworkId] ; !ok {
+			f = &Framework{
+				Executors: make(map[string]*Executor),
+			}
+			c.Sample.Frameworks[frameworkId] = f
+			framework = f
+		} else {
+			framework = f
+		}
+
+		var executor *Executor
+		if e, ok := framework.Executors[executorId] ; !ok {
+			e = &Executor {}
+			framework.Executors[executorId] = e
+			executor = e
+		} else {
+			executor = e
+
+			// TODO(nnielsen): Save # samples.
+			// Compute new values since last sample.
+
+			limit := e.Stat.Statistics["cpus_limit"].(float64)
+			_ = limit
+
+			totalTime := stat.Statistics["timestamp"].(float64) - e.Stat.Statistics["timestamp"].(float64)
+			userTime := stat.Statistics["cpus_user_time_secs"].(float64) - e.Stat.Statistics["cpus_user_time_secs"].(float64)
+			systemTime := stat.Statistics["cpus_system_time_secs"].(float64) - e.Stat.Statistics["cpus_system_time_secs"].(float64)
+
+			executor.Cpus = (userTime + systemTime) / totalTime
+			executor.Memory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
+		}
+
+		glog.V(2).Info(stat)
+
+		executor.Stat = stat
+	}
+}
