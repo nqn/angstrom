@@ -65,7 +65,7 @@ func taskHandler(driver *mesos.ExecutorDriver, taskInfo mesos.TaskInfo) {
 			// })
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 }

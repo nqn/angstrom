@@ -13,10 +13,9 @@ import (
 )
 
 const defaultSampleLimit = 10
+const defaultMinCoverage = 80.0
 
 func Initialize(port int, angstromPath string, cluster *acluster.Cluster) {
-	http.ListenAndServe(":" + strconv.Itoa(port), nil)
-
 	// Serve Web UI.
 	http.Handle("/", http.FileServer(http.Dir(angstromPath + "/assets")))
 
@@ -71,6 +70,11 @@ func Initialize(port int, angstromPath string, cluster *acluster.Cluster) {
 
 			// TODO(nnielsen): Separate into payload package.
 
+			// TODO(nnielsen): These samples should not have been collected at all.
+			if (sample.CoverageCpusPercent < defaultMinCoverage) || (sample.CoverageMemoryPercent < defaultMinCoverage) {
+				continue
+			}
+
 			if (sample.Timestamp < from) || (sample.Timestamp > to) || (sampleCount >= limit) {
 				continue
 			}
@@ -113,4 +117,5 @@ func Initialize(port int, angstromPath string, cluster *acluster.Cluster) {
 		}
 	})
 
+	http.ListenAndServe(":" + strconv.Itoa(port), nil)
 }

@@ -23,9 +23,12 @@ type Slave struct {
 
 type Executor struct {
 	Stat payload.StatisticsInfo
-	Cpus float64
-	Memory float64
-	Disk float64
+	UsedCpus float64
+	UsedMemory float64
+	UsedDisk float64
+	LimitCpus float64
+	LimitMemory float64
+	LimitDisk float64
 }
 
 type Framework struct {
@@ -33,6 +36,7 @@ type Framework struct {
 }
 
 // TODO(nnielsen): Create struct for cpu, memory and disk stats.
+// TODO(nnielsen): Add custom types for percentages.
 type ClusterSample struct {
 	Cpus float64
 	Memory float64
@@ -49,6 +53,10 @@ type ClusterSample struct {
 	Slaves map[string]*Slave
 	Frameworks map[string]*Framework
 	Timestamp int64
+	CoverageCpus float64
+	CoverageCpusPercent float64
+	CoverageMemory float64
+	CoverageMemoryPercent float64
 }
 
 type Cluster struct {
@@ -67,8 +75,10 @@ func NewCluster(master string) *Cluster {
 
 func (c *Cluster) Update() {
 	// TODO(nnielsen): Post-pone sample if insufficient usage data has been presented.
+	// Difficult when slave list is being generated in same go and need to be available
+	// up front.
 	// TODO(nnielsen): Report sample accuracy / coverage.
-
+	// Store sample
 	if c.Sample != nil {
 		c.ArchiveLock.Lock()
 		c.Archive.PushBack(c.Sample)
@@ -85,10 +95,15 @@ func (c *Cluster) Update() {
 		c.ArchiveLock.Unlock()
 	}
 
+	// TODO(nnielsen): Used (and collected) data needs to be differentiated from static / snapshot like ones! This is a hack where we compute usage based on previous sample.
+	previousSample := c.Sample
+
 	c.Sample = &ClusterSample {
 		Slaves: make(map[string]*Slave),
 		Frameworks: make(map[string]*Framework),
 	}
+
+	sample := c.Sample
 
 	resp, err := http.Get("http://" + c.Master + "/master/state.json")
 	if err != nil {
@@ -105,8 +120,6 @@ func (c *Cluster) Update() {
 	if err != nil {
 		glog.Fatalf("Error deserializing RenderResult from JSON: " + err.Error())
 	}
-
-	sample := c.Sample
 
 	sample.Cpus = 0.0
 	sample.Memory = 0
@@ -150,29 +163,39 @@ func (c *Cluster) Update() {
 	sample.UsedCpus = 0.0
 	sample.UsedMemory = 0
 	sample.UsedDisk = 0
-	for frameworkId, framework := range sample.Frameworks {
-		if _, ok := activeFrameworks[frameworkId] ; ! ok {
-			glog.V(2).Infof("Removing inactive framework: " + frameworkId)
-			delete(sample.Frameworks, frameworkId)
-		} else {
-			for _, executor := range framework.Executors {
-				sample.UsedCpus += executor.Cpus
-				sample.UsedMemory += executor.Memory
+
+	if previousSample != nil {
+		for frameworkId, framework := range previousSample.Frameworks {
+			if _, ok := activeFrameworks[frameworkId] ; ok {
+				for _, executor := range framework.Executors {
+					sample.UsedCpus += executor.UsedCpus
+					sample.UsedMemory += executor.UsedMemory
+
+					sample.CoverageCpus += executor.LimitCpus
+					sample.CoverageMemory += executor.LimitMemory
+					// We cannot record disk usage at the moment.
+				}
 			}
 		}
-	}
 
-	// Compute slack.
-	sample.SlackCpus = sample.AllocatedCpus - sample.UsedCpus
-	sample.SlackMemory = sample.AllocatedMemory - sample.UsedMemory
-	sample.SlackDisk = sample.AllocatedDisk - sample.UsedDisk
+		sample.CoverageCpusPercent = ((sample.CoverageCpus / sample.AllocatedCpus) * 100)
+		sample.CoverageMemoryPercent = ((sample.CoverageMemory / sample.AllocatedMemory) * 100)
+
+		// Compute slack.
+		sample.SlackCpus = sample.AllocatedCpus - sample.UsedCpus
+		sample.SlackMemory = sample.AllocatedMemory - sample.UsedMemory
+		sample.SlackDisk = sample.AllocatedDisk - sample.UsedDisk
+	}
 
 	// Set timestamp.
 	// Timestamp is in milliseconds.
 	sample.Timestamp = time.Now().UnixNano() / 1e6
+
 }
 
 func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.StatisticsInfo) {
+
+	// TODO(nnielsen): Compute error.
 	for _, stat := range target {
 		frameworkId := stat.FrameworkId
 
@@ -198,21 +221,19 @@ func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.Statis
 		} else {
 			executor = e
 
-			// TODO(nnielsen): Save # samples.
 			// Compute new values since last sample.
-
-			limit := e.Stat.Statistics["cpus_limit"].(float64)
-			_ = limit
+			executor.LimitCpus = e.Stat.Statistics["cpus_limit"].(float64)
+			executor.LimitMemory = e.Stat.Statistics["mem_limit_bytes"].(float64) / (1024 * 1024)
 
 			totalTime := stat.Statistics["timestamp"].(float64) - e.Stat.Statistics["timestamp"].(float64)
 			userTime := stat.Statistics["cpus_user_time_secs"].(float64) - e.Stat.Statistics["cpus_user_time_secs"].(float64)
 			systemTime := stat.Statistics["cpus_system_time_secs"].(float64) - e.Stat.Statistics["cpus_system_time_secs"].(float64)
 
-			executor.Cpus = (userTime + systemTime) / totalTime
-			executor.Memory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
+			executor.UsedCpus = (userTime + systemTime) / totalTime
+			executor.UsedMemory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
 		}
 
-		glog.V(2).Info(stat)
+		// glog.V(2).Info(stat)
 
 		executor.Stat = stat
 	}

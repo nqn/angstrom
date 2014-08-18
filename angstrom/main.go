@@ -21,6 +21,7 @@ import (
 )
 
 const defaultPort = 9000
+const updateInterval = 1 * time.Second
 
 func main() {
 	taskId := 0
@@ -99,7 +100,7 @@ func main() {
 	go func() {
 		for {
 			cluster.Update()
-			time.Sleep(1 * time.Second)
+			time.Sleep(updateInterval)
 		}
 	}()
 
@@ -159,9 +160,6 @@ func main() {
 			},
 
 			FrameworkMessage: func(driver *mesos.SchedulerDriver, _executorId mesos.ExecutorID, slaveId mesos.SlaveID, data string) {
-				// TODO(nnielsen): Move to cluster package.
-
-				// TODO(nnielsen): Compute error.
 				var target []payload.StatisticsInfo
 				err := json.Unmarshal([]byte(data), &target)
 				if err != nil {
@@ -182,7 +180,6 @@ func main() {
 
 	driver.Init()
 	defer driver.Destroy()
-
 	driver.Start()
 
 	endpoints.Initialize(defaultPort, *angstromPath, cluster)
