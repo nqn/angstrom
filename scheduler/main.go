@@ -7,6 +7,7 @@ import (
 	"github.com/mesosphere/mesos-go/mesos"
 	"strconv"
 	"time"
+	"math"
 	"sync"
 	"net"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"path/filepath"
 	"net/http"
 	"github.com/golang/glog"
+	"net/url"
 )
 
 const archiveMaxSize = 2048
@@ -439,13 +441,30 @@ func main() {
 		glog.V(2).Infof("Request: %s", r.URL)
 		glog.V(2).Infof("Total samples: %d", cluster.Archive.Len())
 
+		var limit int64 = 10
+		var from int64 = 0
+		var to int64 = math.MaxInt64
+
+		query, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			glog.V(2).Infof("%v", query)
+		}
+
 		// TODO(nnielsen): Support 'from' and 'to' fields, specifying samples in time range to serve.
 		// TODO(nnielsen): Support 'limit' field. Default limit should be 10.
 		c := make([]*ClusterStateJson, 0)
 
+		var sampleCount int64 = 0
 		cluster.ArchiveLock.RLock()
 		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
 			sample := e.Value.(*ClusterSample)
+
+			if (sample.Timestamp < from) || (sample.Timestamp > to) || (sampleCount > limit) {
+				continue
+			}
+
+			sampleCount++
+
 			c = append(c, &ClusterStateJson {
 				TotalCpus: sample.Cpus,
 				TotalMemory: sample.Memory,
