@@ -222,6 +222,7 @@ func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.Statis
 			executor = e
 
 			// Compute new values since last sample.
+			// TODO(nnielsen): Defer this to angstrom task and get finer resolution average, min, max and derivation.
 			executor.LimitCpus = e.Stat.Statistics["cpus_limit"].(float64)
 			executor.LimitMemory = e.Stat.Statistics["mem_limit_bytes"].(float64) / (1024 * 1024)
 
@@ -233,7 +234,7 @@ func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.Statis
 			executor.UsedMemory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
 		}
 
-		// glog.V(2).Info(stat)
+		glog.V(2).Info(stat)
 
 		executor.Stat = stat
 	}

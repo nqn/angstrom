@@ -65,7 +65,7 @@ func Initialize(port int, angstromPath string, cluster *acluster.Cluster) {
 
 		var sampleCount int64 = 0
 		cluster.ArchiveLock.RLock()
-		for e := cluster.Archive.Front(); e != nil; e = e.Next() {
+		for e := cluster.Archive.Back(); e != nil; e = e.Prev() {
 			sample := e.Value.(*acluster.ClusterSample)
 
 			// TODO(nnielsen): Separate into payload package.

@@ -110,6 +110,9 @@ func main() {
 		slaves.PushBack(slaveHostname)
 	}
 
+	// TODO(nnielsen): Move this and callbacks to dedicated scheduler package / struct.
+	var taskToSlave map[string]string
+
 	scheduleTask := func(offer mesos.Offer) *mesos.TaskInfo {
 		slave := slaves.Front()
 		if slave == nil {
@@ -118,12 +121,13 @@ func main() {
 
 		slaves.Remove(slave)
 
-		// TODO(nnielsen): Map task -> monitored slave, for restart.
+		task := "angstrom-task-" + strconv.Itoa(taskId)
+		taskToSlave[task] = slave.Value.(string)
 
 		return &mesos.TaskInfo{
 			Name: proto.String("angstrom-task"),
 			TaskId: &mesos.TaskID{
-				Value: proto.String("angstrom-task-" + strconv.Itoa(taskId)),
+				Value: proto.String(task),
 			},
 			SlaveId:  offer.SlaveId,
 			Executor: executor,
