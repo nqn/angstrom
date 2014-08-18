@@ -164,9 +164,9 @@ func (c *Cluster) Update() {
 	sample.SlackMemory = sample.AllocatedMemory - sample.UsedMemory
 	sample.SlackDisk = sample.AllocatedDisk - sample.UsedDisk
 
-	// TODO(nnielsen): Increase timestamp resolution.
 	// Set timestamp.
-	sample.Timestamp = time.Now().Unix()
+	// Timestamp is in milliseconds.
+	sample.Timestamp = time.Now().UnixNano() / 1e6
 }
 
 func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.StatisticsInfo) {
