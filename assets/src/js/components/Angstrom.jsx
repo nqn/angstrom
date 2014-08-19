@@ -6,6 +6,7 @@ var Chart = require("./Chart.jsx");
 var DataSeries = require("./DataSeries.jsx");
 var BackboneMixin = require("../mixins/BackboneMixin");
 var d3 = require("d3");
+require("../libs/nv.d3");
 var DataCenterMetricsCollection = require("../models/DataCenterMetricsCollection");
 
 var UPDATE_INTERVAL = 5000;
@@ -68,24 +69,42 @@ module.exports = React.createClass({
 
     var collection = this.state.collection;
     if (collection.models.length > 0) {
-      console.log(collection.get("TotalMemory").get("series"), collection.get("AllocatedMemory").get("series"), collection.get("UsedMemory").get("series"));
-      var size = { width: this.props.width, height: this.props.height };
+      var data = [
+        {
+          key: "TotalCpus",
+          values: collection.get("TotalCpus").get("series")
+        },
+        {
+          key: "AllocatedCpus",
+          values: collection.get("AllocatedCpus").get("series")
+        },
+        {
+          key: "UsedCpus",
+          values: collection.get("UsedCpus").get("series")
+        }
+      ];
+      nv.addGraph(function() {
+        var chart = nv.models.stackedAreaChart()
+                      .margin({right: 100})
+                      .x(function(d) { return d.x; })   //We can modify the data accessor functions...
+                      .y(function(d) { return d.y; })   //...in case your data is formatted differently.
+                      .useInteractiveGuideline(true)    //Tooltips which show all data points. Very nice!
+                      .rightAlignYAxis(true)      //Let's move the y-axis to the right side.
+                      .transitionDuration(500)
+                      .showControls(true)       //Allow user to choose 'Stacked', 'Stream', 'Expanded' mode.
+                      .clipEdge(true);
 
-      var max = _.chain(collection.get("TotalMemory").get("series"), collection.get("AllocatedMemory").get("series"), collection.get("UsedMemory").get("series"))
-        .zip()
-        .map(function(values) {
-          return _.reduce(values, function(memo, value) { return Math.max(memo, value.y); }, 0);
-        })
-        .max()
-        .value();
+        //Format x-axis labels with custom function.
+        chart.xAxis
+            .tickFormat(d3.format(",.2f"));
 
-      var xScale = d3.scale.linear()
-        .domain([0, collection.get("TotalMemory").get("series").length])
-        .range([0, this.props.width]);
+        chart.yAxis
+            .tickFormat(d3.format(",.2f"));
 
-      var yScale = d3.scale.linear()
-        .domain([0, max])
-        .range([0, this.props.height]);
+        d3.select("#chart svg")
+          .datum(data)
+          .call(chart);
+      });
     }
 
     /* jshint trailing:false, quotmark:false, newcap:false */
@@ -102,14 +121,8 @@ module.exports = React.createClass({
         <div className="container-fluid">
           {
             collection.models.length > 0 ?
-              <div>
-                <Chart width={this.props.width} height={this.props.height}>
-                  <DataSeries data={collection.get("TotalMemory").get("series")} size={size} xScale={xScale} yScale={yScale} ref="series1" color="green" fill="green" />
-
-                  <DataSeries data={collection.get("AllocatedMemory").get("series")} size={size} xScale={xScale} yScale={yScale} ref="series2" color="red" fill="red" />
-
-                  <DataSeries data={collection.get("UsedMemory").get("series")} size={size} xScale={xScale} yScale={yScale} ref="series3" color="cornflowerblue" fill="lightsteelblue" />
-                </Chart>
+              <div id="chart">
+                <svg />
               </div> :
               null
           }
