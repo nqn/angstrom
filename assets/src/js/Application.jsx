@@ -19,6 +19,7 @@ var ApplicationRouter = Backbone.Router.extend({
   },
 
   home: function() {
+    /* jshint trailing:false, quotmark:false, newcap:false */
     React.renderComponent(
       <Angstrom />,
       document.getElementById("angstrom")

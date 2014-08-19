@@ -4,7 +4,7 @@ module.exports = {
     this.getBackboneModels().forEach(function(model) {
       // There are more events that we can listen on. For most cases, we're fetching
       // pages of data, listening to add events causes superfluous calls to render.
-      model.on('all', this._boundForceUpdate, this);
+      model.on("all", this._boundForceUpdate, this);
       model.fetch({ reset: true });
     }, this);
   },
