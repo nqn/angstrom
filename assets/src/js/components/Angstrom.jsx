@@ -8,17 +8,19 @@ var BackboneMixin = require("../mixins/BackboneMixin");
 var d3 = require("d3");
 var DataCenterMetricsCollection = require("../models/DataCenterMetricsCollection");
 
+var UPDATE_INTERVAL = 5000;
+
 module.exports = React.createClass({
   displayName: "Angstrom",
+
   mixins: [BackboneMixin],
+
   getInitialState: function() {
     return {
       collection: new DataCenterMetricsCollection()
     };
   },
-  getBackboneModels: function () {
-    return this.state.collection;
-  },
+
   getDefaultProps: function () {
     return {
       interpolate: "linear",
@@ -26,13 +28,40 @@ module.exports = React.createClass({
       height: 300
     };
   },
-  componentDidMount: function () {
+
+  getBackboneModels: function () {
+    return this.state.collection;
+  },
+
+  fetchResource: function () {
     this.state.collection.fetch({
       reset: true,
       success: function () {
         this._boundForceUpdate();
       }.bind(this)
     });
+  },
+
+  componentDidMount: function() {
+      this.startPolling();
+  },
+
+  componentWillUnmount: function() {
+    this.stopPolling();
+  },
+
+  startPolling: function() {
+    if (this._interval == null) {
+      this.fetchResource();
+      this._interval = setInterval(this.fetchResource, UPDATE_INTERVAL);
+    }
+  },
+
+  stopPolling: function() {
+    if (this._interval != null) {
+      clearInterval(this._interval);
+      this._interval = null;
+    }
   },
 
   render: function() {
