@@ -60,6 +60,17 @@ module.exports = function(grunt) {
             expand: true           // required when using cwd
           }
         ]
+      },
+      css: {
+        files: [
+          {
+            cwd: "<%= conf.sass %>",
+            src: "**/*.css",
+            dest: "<%= conf.css %>",    // destination folder
+            expand: true,           // required when using cwd
+            filter: "isFile"
+          }
+        ]
       }
     },
     watch: {
@@ -69,9 +80,13 @@ module.exports = function(grunt) {
           "<%= conf.compiled %>"
         ]
       },
-      css: {
-        files: ["**/*.sass", "**/*.scss"],
+      sass: {
+        files: ["<%= conf.sass %>**/*.sass", "<%= conf.sass %>**/*.scss"],
         tasks: ["compass"]
+      },
+      css: {
+        files: ["<%= conf.sass %>**/*.css"],
+        tasks: ["copy:css"]
       },
       html: {
         files: ["<%= conf.src %>**/*.html"],
