@@ -23,10 +23,10 @@ module.exports = function(grunt) {
       compiled: "<%= conf.pub %>/js/<%= pkg.name %>.js",
       tests: [ "tests/**/*.js" ],
       sys: [ "Gruntfile.js", "package.json" ],
-      sass: "<%= conf.src %>/scss",
-      css: "<%= conf.pub %>/css",
+      sass: "<%= conf.src %>scss",
+      css: "<%= conf.pub %>css",
       src: "src/",
-      js: "<%= conf.src %>/js/",
+      js: "<%= conf.src %>js/",
       pub: "public/",
       build: "build/"
     },
@@ -48,15 +48,19 @@ module.exports = function(grunt) {
             dest: "<%= conf.pub %>",    // destination folder
             expand: true,           // required when using cwd
             filter: "isFile"
-          },
-          // {
-          //   cwd: "<%= conf.src %>img/",
-          //   src: "*",
-          //   dest: "<%= conf.pub %>img/",    // destination folder
-          //   expand: true           // required when using cwd
-          // }
+          }
         ]
       },
+      img: {
+        files: [
+          {
+            cwd: "<%= conf.src %>",
+            src: ["img/**"],
+            dest: "<%= conf.pub %>",    // destination folder
+            expand: true           // required when using cwd
+          }
+        ]
+      }
     },
     watch: {
       app: {
@@ -69,10 +73,14 @@ module.exports = function(grunt) {
         files: ["**/*.sass", "**/*.scss"],
         tasks: ["compass"]
       },
-      cp: {
-        files: ["**/*.html"],
-        tasks: ["copy"]
+      html: {
+        files: ["<%= conf.src %>**/*.html"],
+        tasks: ["copy:html"]
       },
+      img: {
+        files: ["<%= conf.src %>**/*"],
+        tasks: ["copy:img"]
+      }
       // test: {
       //   files: [
       //     "<%= conf.sys %>",
