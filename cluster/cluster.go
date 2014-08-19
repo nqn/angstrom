@@ -153,11 +153,9 @@ func (c *Cluster) Update() {
 
 		frameworkCPUs := framework.Resources["cpus"].(float64)
 		frameworkMemory := framework.Resources["mem"].(float64)
-		frameworkDisk := framework.Resources["disk"].(float64)
 
 		sample.AllocatedCpus += frameworkCPUs
 		sample.AllocatedMemory += frameworkMemory
-		sample.AllocatedDisk += frameworkDisk
 	}
 
 	sample.UsedCpus = 0.0

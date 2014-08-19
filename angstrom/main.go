@@ -7,7 +7,6 @@ import (
 	"github.com/mesosphere/mesos-go/mesos"
 	"strconv"
 	"time"
-	"net"
 	"encoding/json"
 	"strings"
 	"container/list"
