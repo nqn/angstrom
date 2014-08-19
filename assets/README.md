@@ -1,6 +1,7 @@
 ## Install
 
 ```
+$ npm install -g grunt-cli
 $ gem install compass
 $ npm install
 ```
