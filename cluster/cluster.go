@@ -125,13 +125,20 @@ func (c *Cluster) Update() {
 	sample.Memory = 0
 	sample.Disk = 0
 	for _, slave := range target.Slaves {
-		slaveCPUs := slave.Resources["cpus"].(float64)
-		slaveMemory := slave.Resources["mem"].(float64)
-		slaveDisk := slave.Resources["disk"].(float64)
+		if slave.Resources["cpus"] != nil {
+			slaveCPUs := slave.Resources["cpus"].(float64)
+			sample.Cpus += slaveCPUs
+		}
 
-		sample.Cpus += slaveCPUs
-		sample.Memory += slaveMemory
-		sample.Disk += slaveDisk
+		if slave.Resources["mem"] != nil {
+			slaveMemory := slave.Resources["mem"].(float64)
+			sample.Memory += slaveMemory
+		}
+
+		if slave.Resources["disk"] != nil {
+			slaveDisk := slave.Resources["disk"].(float64)
+			sample.Disk += slaveDisk
+		}
 
 		pidSplit := strings.Split(slave.Pid, "@")
 		hostPort := pidSplit[1]
@@ -151,8 +158,15 @@ func (c *Cluster) Update() {
 	for _, framework := range target.Frameworks {
 		activeFrameworks[framework.Id] = struct{}{}
 
-		frameworkCPUs := framework.Resources["cpus"].(float64)
-		frameworkMemory := framework.Resources["mem"].(float64)
+		frameworkCPUs := 0.0
+		if framework.Resources["cpus"] != nil {
+			frameworkCPUs = framework.Resources["cpus"].(float64)
+		}
+
+		frameworkMemory := 0.0
+		if framework.Resources["mem"] != nil {
+			frameworkMemory = framework.Resources["mem"].(float64)
+		}
 
 		sample.AllocatedCpus += frameworkCPUs
 		sample.AllocatedMemory += frameworkMemory
@@ -221,15 +235,35 @@ func (c *Cluster) AddSlaveSamples(slaveId mesos.SlaveID, target []payload.Statis
 
 			// Compute new values since last sample.
 			// TODO(nnielsen): Defer this to angstrom task and get finer resolution average, min, max and derivation.
-			executor.LimitCpus = e.Stat.Statistics["cpus_limit"].(float64)
-			executor.LimitMemory = e.Stat.Statistics["mem_limit_bytes"].(float64) / (1024 * 1024)
+			if e.Stat.Statistics["cpus_limit"] != nil {
+				executor.LimitCpus = e.Stat.Statistics["cpus_limit"].(float64)
+			}
 
-			totalTime := stat.Statistics["timestamp"].(float64) - e.Stat.Statistics["timestamp"].(float64)
-			userTime := stat.Statistics["cpus_user_time_secs"].(float64) - e.Stat.Statistics["cpus_user_time_secs"].(float64)
-			systemTime := stat.Statistics["cpus_system_time_secs"].(float64) - e.Stat.Statistics["cpus_system_time_secs"].(float64)
+			if e.Stat.Statistics["mem_limit_bytes"] != nil {
+				executor.LimitMemory = e.Stat.Statistics["mem_limit_bytes"].(float64) / (1024 * 1024)
+			}
+
+
+			totalTime := 0.0
+			if stat.Statistics["timestamp"] != nil {
+				totalTime = stat.Statistics["timestamp"].(float64) - e.Stat.Statistics["timestamp"].(float64)
+			}
+
+			userTime := 0.0
+			if stat.Statistics["cpus_user_time_secs"] != nil {
+				userTime = stat.Statistics["cpus_user_time_secs"].(float64) - e.Stat.Statistics["cpus_user_time_secs"].(float64)
+			}
+
+			systemTime := 0.0
+			if stat.Statistics["cpus_system_time_secs"] != nil {
+				systemTime = stat.Statistics["cpus_system_time_secs"].(float64) - e.Stat.Statistics["cpus_system_time_secs"].(float64)
+			}
 
 			executor.UsedCpus = (userTime + systemTime) / totalTime
-			executor.UsedMemory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
+
+			if stat.Statistics["mem_rss_bytes"] != nil {
+				executor.UsedMemory = stat.Statistics["mem_rss_bytes"].(float64) / (1024 * 1024)
+			}
 		}
 
 		glog.V(2).Info(stat)
