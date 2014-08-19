@@ -77,24 +77,9 @@ module.exports = function(grunt) {
       app: {
         files: [
           "<%= conf.sys %>",
-          "<%= conf.compiled %>"
-        ]
-      },
-      sass: {
-        files: ["<%= conf.sass %>**/*.sass", "<%= conf.sass %>**/*.scss"],
-        tasks: ["compass"]
-      },
-      css: {
-        files: ["<%= conf.sass %>**/*.css"],
-        tasks: ["copy:css"]
-      },
-      html: {
-        files: ["<%= conf.src %>**/*.html"],
-        tasks: ["copy:html"]
-      },
-      img: {
-        files: ["<%= conf.src %>**/*"],
-        tasks: ["copy:img"]
+          "<%= conf.src %>"
+        ],
+        tasks: ["dev"]
       }
       // test: {
       //   files: [
@@ -164,7 +149,7 @@ module.exports = function(grunt) {
       app: [
         "Gruntfile.js",
         "<%= conf.build %>**/*.js", // JSX files
-        "<%= conf.src %>/**/*.jsx" // Exclude the JSX
+        "<%= conf.src %>/**/*.js" // Exclude the JSX
       ],
       tests: [ "<%= conf.tests %>" ],
       options: {
@@ -207,7 +192,11 @@ module.exports = function(grunt) {
   ]);
 
   grunt.registerTask("dev", [
-    "browserify:app"
+    "browserify:app",
+    "compass",
+    "copy:css",
+    "copy:html",
+    "copy:img"
   ]);
 
   grunt.registerTask("run", [
