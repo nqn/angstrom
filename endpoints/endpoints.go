@@ -17,7 +17,7 @@ const defaultMinCoverage = 80.0
 
 func Initialize(port int, angstromPath string, cluster *acluster.Cluster) {
 	// Serve Web UI.
-	http.Handle("/", http.FileServer(http.Dir(angstromPath + "/assets")))
+	http.Handle("/", http.FileServer(http.Dir(angstromPath + "/assets/public")))
 
 	// TODO(nnielsen): Separate HTTP handling into resources.go.
 	http.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {

@@ -26,19 +26,12 @@ const updateInterval = 1 * time.Second
 func main() {
 	taskId := 0
 	localExecutor, _ := executorPath()
-	hostname, _ := os.Hostname()
 
 	goPath := os.Getenv("GOPATH") + "/"
 
-	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
-	executorPath := flag.String("executor-uri", localExecutor, "Path to executor executable")
-	address := flag.String("address", hostname, "Hostname to serve artifacts from")
-	angstromPath := flag.String("angstrom-path", goPath + "src/github.com/nqn/angstrom", "Path to angstrom checkout")
-
-	flag.Parse()
-
 	// TODO(nnielsen): Hide in helper.
 	// Determine address to listen on.
+  hostname := ""
 	interfaces, _ := net.Interfaces()
 	for _, inter := range interfaces {
 		if inter.Name == "lo" {
@@ -48,10 +41,17 @@ func main() {
 		if err == nil {
 			network := addr[0].String()
 			networkSplit := strings.Split(network, "/")
-			address = &networkSplit[0]
+			hostname = networkSplit[0]
 			break
 		}
 	}
+
+	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
+	executorPath := flag.String("executor-uri", localExecutor, "Path to executor executable")
+	address := flag.String("address", hostname, "Hostname to serve artifacts from")
+	angstromPath := flag.String("angstrom-path", goPath + "src/github.com/nqn/angstrom", "Path to angstrom checkout")
+
+	flag.Parse()
 
 	serveExecutorArtifact := func(path string) string {
 		serveFile := func(pattern string, filename string) {
@@ -111,13 +111,15 @@ func main() {
 	}
 
 	// TODO(nnielsen): Move this and callbacks to dedicated scheduler package / struct.
-	var taskToSlave map[string]string
+	taskToSlave := make(map[string]string)
 
 	scheduleTask := func(offer mesos.Offer) *mesos.TaskInfo {
 		slave := slaves.Front()
 		if slave == nil {
 			return nil
 		}
+
+                glog.V(2).Infof("Scheduling slave '%s'", slave.Value.(string))
 
 		slaves.Remove(slave)
 
@@ -154,9 +156,12 @@ func main() {
 					tasks := make([]mesos.TaskInfo, 0)
 
 					task := scheduleTask(offer) ; if task != nil {
+                                                glog.V(2).Infof("Launching on offer %v", offer.Id)
+
 						tasks = append(tasks, *task)
 						driver.LaunchTasks(offer.Id, tasks)
 					} else {
+                                                glog.V(2).Infof("Declining offer %v", offer.Id)
 						driver.DeclineOffer(offer.Id)
 					}
 
@@ -187,6 +192,8 @@ func main() {
 	driver.Start()
 
 	endpoints.Initialize(defaultPort, *angstromPath, cluster)
+
+        glog.V(2).Infof("Waiting for threads to join")
 
 	driver.Join()
 }
