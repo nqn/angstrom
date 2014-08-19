@@ -8,9 +8,21 @@ Scalable, self-hosted metrics collection and global cluster state for Mesos.
 
 ## Build instructions
 
+### Mac OS X
 ```bash
+$ brew install protobuf
+```
+
+### Linux
+
+```bash
+$ sudo aptitude install libprotobuf-dev
+```
+
+```bash
+$ export GOPATH=$PWD
 $ go get github.com/nqn/angstrom/{angstrom,angstrom-executor}
-$ $(GOPATH)/bin/angstrom -master <mesos-master-ip:port>
+$ $GOPATH/bin/angstrom -master <mesos-master-ip:port>
 ```
 
 ## WebUI

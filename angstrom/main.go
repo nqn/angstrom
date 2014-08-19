@@ -29,26 +29,9 @@ func main() {
 
 	goPath := os.Getenv("GOPATH") + "/"
 
-	// TODO(nnielsen): Hide in helper.
-	// Determine address to listen on.
-  hostname := ""
-	interfaces, _ := net.Interfaces()
-	for _, inter := range interfaces {
-		if inter.Name == "lo" {
-			continue
-		}
-		addr, err := inter.Addrs()
-		if err == nil {
-			network := addr[0].String()
-			networkSplit := strings.Split(network, "/")
-			hostname = networkSplit[0]
-			break
-		}
-	}
-
 	master := flag.String("master", "localhost:5050", "Location of leading Mesos master")
 	executorPath := flag.String("executor-uri", localExecutor, "Path to executor executable")
-	address := flag.String("address", hostname, "Hostname to serve artifacts from")
+	address := flag.String("address", "localhost", "Hostname to serve artifacts from")
 	angstromPath := flag.String("angstrom-path", goPath + "src/github.com/nqn/angstrom", "Path to angstrom checkout")
 
 	flag.Parse()
