@@ -40,9 +40,9 @@ module.exports = Backbone.Collection.extend({
     var model = this;
     var d3Data = [];
     _.each(STATS, function (key) {
-      var series = _.map(response.cluster, function (snapshot, i) {
+      var series = _.map(response.cluster, function (snapshot) {
         return {
-          x: i,
+          x: snapshot["Timestamp"],
           y: snapshot[key]
         };
       });

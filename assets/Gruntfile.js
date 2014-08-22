@@ -2,13 +2,13 @@ module.exports = function(grunt) {
 
   [ "grunt-contrib-watch",
     "grunt-browserify",
-    "grunt-react",
-    "grunt-contrib-uglify",
-    "grunt-contrib-jshint",
     "grunt-contrib-copy",
-    "grunt-contrib-compass",
     "grunt-contrib-connect",
-    "grunt-mocha"
+    "grunt-contrib-less",
+    "grunt-contrib-jshint",
+    "grunt-contrib-uglify",
+    "grunt-mocha",
+    "grunt-react"
   ].forEach(function(n) {
     grunt.loadNpmTasks(n);
   });
@@ -23,19 +23,24 @@ module.exports = function(grunt) {
       compiled: "<%= conf.pub %>/js/<%= pkg.name %>.js",
       tests: [ "tests/**/*.js" ],
       sys: [ "Gruntfile.js", "package.json" ],
-      sass: "<%= conf.src %>scss",
-      css: "<%= conf.pub %>css",
+      less: "<%= conf.src %>less/",
+      css: "<%= conf.pub %>css/",
       src: "src/",
       js: "<%= conf.src %>js/",
       pub: "public/",
       build: "build/"
     },
-    compass: {
-      dist: {
+    less: {
+      dev: {
         options: {
-          sassDir: "<%= conf.sass %>",
-          cssDir: "<%= conf.css %>",
-          outputStyle: "compressed"
+          strictMath: true,
+          sourceMap: true,
+          outputSourceFiles: true,
+          sourceMapURL: "<%= pkg.name %>.css.map",
+          sourceMapFilename: "dist/css/<%= pkg.name %>.css.map"
+        },
+        files: {
+          "<%= conf.css %>angstrom.css": "<%= conf.less %>angstrom.less"
         }
       }
     },
@@ -61,10 +66,20 @@ module.exports = function(grunt) {
           }
         ]
       },
+      fonts: {
+        files: [
+          {
+            cwd: "<%= conf.src %>",
+            src: ["fonts/**"],
+            dest: "<%= conf.pub %>",    // destination folder
+            expand: true           // required when using cwd
+          }
+        ]
+      },
       css: {
         files: [
           {
-            cwd: "<%= conf.sass %>",
+            cwd: "<%= conf.less %>",
             src: "**/*.css",
             dest: "<%= conf.css %>",    // destination folder
             expand: true,           // required when using cwd
@@ -193,9 +208,10 @@ module.exports = function(grunt) {
 
   grunt.registerTask("dev", [
     "browserify:app",
-    "compass",
+    "less",
     "copy:css",
     "copy:html",
+    "copy:fonts",
     "copy:img"
   ]);
 
