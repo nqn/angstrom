@@ -21,8 +21,8 @@ module.exports = React.createClass({
   getDefaultProps: function () {
     return {
       collection: [],
-      width: 900,
-      height: 800
+      width: 1200,
+      height: 400
     };
   },
 
@@ -33,10 +33,9 @@ module.exports = React.createClass({
                     .x(function(d) { return d.x; })   // We can modify the data accessor functions...
                     .y(function(d) { return d.y; })   // ...in case your data is formatted differently.
                     .useInteractiveGuideline(true)    // Tooltips which show all data points. Very nice!
-                    .rightAlignYAxis(true)      // Let's move the y-axis to the right side.
-                    .transitionDuration(300)
-                    // .showControls(true)       // Allow user to choose "Stacked", "Stream", "Expanded" mode.
-                    .clipEdge(true);
+                    .transitionDuration(500)
+                    .showControls(false);       // Allow user to choose "Stacked", "Stream", "Expanded" mode.
+                    // .clipEdge(true);
 
        // Format x-axis labels with custom function.
       chart.xAxis
@@ -45,16 +44,21 @@ module.exports = React.createClass({
       });
 
       chart.width( this.props.width );
-        // .height( this.props.height )
+      //   .height( this.props.height );
 
-      // chart.yAxis
-      //     .tickFormat(d3.format(",.2f"));
+      chart.yAxis
+          .tickFormat(d3.format(","));
 
 
       // set state
       this.setState({chart: chart});
+
+      // nv.utils.windowResize(this.updateChart(this.props));
+
+
       d3.select(this.getDOMNode())
-        .call(chart);
+        .call(chart)
+        .call(this.updateChart(this.props));
     }.bind(this));
   },
 
@@ -84,8 +88,11 @@ module.exports = React.createClass({
   },
 
   render: function() {
+    var style = {
+      height: this.props.height
+    };
     return (
-      <svg />
+      <svg style={style} />
     );
   }
 });

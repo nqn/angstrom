@@ -1,7 +1,7 @@
 var _ = require("underscore");
 var Backbone = require("backbone");
 
-var DataCenterMetrics = require ("./DataCenterMetrics");
+var DataCenterMetrics = require("./DataCenterMetrics");
 
 var STATS = [
     "TotalCpus",
@@ -24,8 +24,7 @@ var STATS = [
     "SlackMemory",
     "SlackMemoryPercent",
     "SlackDisk",
-    "SlackDiskPercent",
-    "Timestamp"
+    "SlackDiskPercent"
   ];
 
 module.exports = Backbone.Collection.extend({
