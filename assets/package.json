@@ -8,6 +8,7 @@
     "d3": "^3.4.11",
     "jquery": "~2.1.0",
     "react": "~0.10.0",
+    "rickshaw": "^1.4.6",
     "underscore": "~1.6.0"
   },
   "devDependencies": {
