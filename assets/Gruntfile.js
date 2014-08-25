@@ -37,7 +37,7 @@ module.exports = function(grunt) {
           sourceMap: true,
           outputSourceFiles: true,
           sourceMapURL: "<%= pkg.name %>.css.map",
-          sourceMapFilename: "dist/css/<%= pkg.name %>.css.map"
+          sourceMapFilename: "<%= conf.css %><%= pkg.name %>.css.map"
         },
         files: {
           "<%= conf.css %>angstrom.css": "<%= conf.less %>angstrom.less"
