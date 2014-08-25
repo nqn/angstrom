@@ -56,55 +56,66 @@ module.exports = React.createClass({
 
   render: function() {
 
-    var collection = this.state.collection;
-    var Cpus = [];
-    var Memory = [];
+    var collection = this.state.collection.models;
+    var revisedData = [];
+
+    var CpusDef = [];
+    var MemoryDef = [];
+    var data = [];
+
+
     if (collection.length > 0) {
-      Cpus = [
+      CpusDef = [
         {
-          key: "TotalCpus",
-          color: "#428bca",
-          values: _.sortBy(collection.get("TotalCpus").get("series"), "x"),
-        },
-        {
-          key: "AllocatedCpus",
-          color: "#00b482",
-          values: _.sortBy(collection.get("AllocatedCpus").get("series"), "x"),
-        },
-        {
-          key: "UsedCpus",
-          color: "#faef66",
-          values: _.sortBy(collection.get("UsedCpus").get("series"), "x"),
-        },
-        {
-          key: "SlackCpus",
+          name: "SlackCpus",
           color: "#d9534f",
-          values: _.sortBy(collection.get("SlackCpus").get("series"), "x"),
+          // renderer: "value"
+        },
+        {
+          name: "UsedCpus",
+          color: "#faef66",
+          // renderer: "value"
+        },
+        {
+          name: "AllocatedCpus",
+          color: "#00b482",
+          // renderer: "value"
+        },
+        {
+          name: "TotalCpus",
+          color: "#428bca",
+          // stroke: 'rgba(0,0,0,0.15)',
+          // renderer: "value"
         }
       ];
 
-      Memory = [
+      MemoryDef = [
         {
-          key: "TotalMemory",
-          values: _.sortBy(collection.get("TotalMemory").get("series"), "x"),
-          color: "#428bca"
+          name: "SlackMemory",
+          color: "#d9534f",
+          // renderer: "value"
         },
         {
-          key: "AllocatedMemory",
-          values: _.sortBy(collection.get("AllocatedMemory").get("series"), "x"),
-          color: "#00b482"
+          name: "UsedMemory",
+          color: "#faef66",
+          // renderer: "value"
         },
         {
-          key: "UsedMemory",
-          values: _.sortBy(collection.get("UsedMemory").get("series"), "x"),
-          color: "#faef66"
+          name: "AllocatedMemory",
+          color: "#00b482",
+          // renderer: "value"
         },
         {
-          key: "SlackMemory",
-          values: _.sortBy(collection.get("SlackMemory").get("series"), "x"),
-          color: "#d9534f"
+          name: "TotalMemory",
+          color: "#428bca",
+          // renderer: "value"
         }
       ];
+
+      // extract attributes
+      _.each(collection, function (child) {
+        data.push(child.attributes);
+      });
     }
 
     /* jshint trailing:false, quotmark:false, newcap:false */
@@ -124,10 +135,10 @@ module.exports = React.createClass({
         </nav>
         <div className="container">
           {
-            collection.models.length > 0 ?
+            collection.length > 0 ?
             <div>
-              <Chart collection={Cpus} />
-              <Chart collection={Memory} />
+              <Chart definitions={CpusDef} collection={data} />
+              <Chart definitions={MemoryDef} collection={data} />
             </div> :
               null
           }
